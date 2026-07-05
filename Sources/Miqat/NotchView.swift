@@ -87,7 +87,7 @@ struct ExpandedPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("HIJRI").font(.system(size: 9, weight: .semibold)).tracking(3)
                         .foregroundStyle(Design.gold.opacity(0.7))
@@ -95,6 +95,13 @@ struct ExpandedPanel: View {
                         .foregroundStyle(Design.cream)
                 }
                 Spacer()
+                HStack(spacing: 4) {
+                    Image(systemName: "location.fill").font(.system(size: 9))
+                        .foregroundStyle(Design.gold.opacity(0.8))
+                    Text(PrayerEngine.cityName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Design.cream).lineLimit(1)
+                }
             }
 
             VStack(spacing: 4) {

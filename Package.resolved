@@ -8,6 +8,15 @@
         "revision" : "a6fa2deee80c5abb0b9ad04466f8ab12b53144e7",
         "version" : "1.5.0"
       }
+    },
+    {
+      "identity" : "skylightwindow",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Lakr233/SkyLightWindow",
+      "state" : {
+        "revision" : "b7bd99f62a0673a99bed4bfd31098ca1dcdd10eb",
+        "version" : "1.0.0"
+      }
     }
   ],
   "version" : 2

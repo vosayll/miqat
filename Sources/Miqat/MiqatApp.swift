@@ -3,14 +3,25 @@ import AppKit
 
 /// Приложение живёт в чёлке + иконка в строке меню (без окна и иконки в доке).
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let clock = ClockModel()
+    private let location = LocationProvider()
     private var controller: NotchController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)      // без иконки в доке
-        let clock = ClockModel()
+
         let controller = NotchController(clock: clock)
         controller.show()
         self.controller = controller
+
+        // Геолокация → обновляем координаты/город и пересчитываем времена намаза.
+        location.onUpdate = { [weak self] in
+            guard let self = self else { return }
+            if let coord = self.location.coordinate { PrayerEngine.coordinate = coord }
+            if let city  = self.location.cityName    { PrayerEngine.cityName = city }
+            self.clock.refresh()
+        }
+        location.start()
     }
 }
 

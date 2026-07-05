@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import SkyLightWindow
 
 /// Состояние чёлки, общее между окном (AppKit) и интерфейсом (SwiftUI).
 final class NotchState: ObservableObject {
@@ -12,6 +13,7 @@ final class NotchState: ObservableObject {
 
 /// Окно-панель у выреза сверху по центру.
 /// • держится на всех Spaces (через CGSSpace);
+/// • показывается на заблокированном экране (через SkyLight);
 /// • окно ФИКСИРОВАННОГО размера, клики проходят насквозь (ignoresMouseEvents);
 /// • пилюля «вырастает» в панель средствами SwiftUI — плавно, без рывков окна;
 /// • наведение ловим по позиции мыши (глобальный монитор) + гистерезис.
@@ -82,6 +84,7 @@ final class NotchController {
         panel.orderFrontRegardless()
         notchSpace.windows.insert(panel)      // показывать на всех Spaces
         startMouseTracking()
+        setupLockScreen()                     // показывать на заблокированном экране
     }
 
     /// Окно всегда одного размера (развёрнутого) и не двигается — контент рисуется сверху.
@@ -92,6 +95,22 @@ final class NotchController {
         let y = sf.maxY - expandedSize.height
         panel.setFrame(NSRect(x: x, y: y, width: expandedSize.width, height: expandedSize.height),
                        display: true)
+    }
+
+    // MARK: - Локскрин (SkyLight)
+
+    private func setupLockScreen() {
+        let dnc = DistributedNotificationCenter.default()
+        dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.state.expanded = false                       // на локскрине — свёрнутая пилюля
+            SkyLightOperator.shared.delegateWindow(self.panel)
+            self.panel.orderFrontRegardless()
+        }
+        dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            SkyLightOperator.shared.undelegateWindow(self.panel)
+        }
     }
 
     // MARK: - Наведение по позиции мыши (без мерцания)

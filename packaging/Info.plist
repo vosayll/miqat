@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>                <string>Miqat</string>
+    <key>CFBundleDisplayName</key>         <string>Miqat</string>
+    <key>CFBundleIdentifier</key>          <string>com.vosayll.miqat</string>
+    <key>CFBundleExecutable</key>          <string>Miqat</string>
+    <key>CFBundlePackageType</key>         <string>APPL</string>
+    <key>CFBundleShortVersionString</key>  <string>0.1.0</string>
+    <key>CFBundleVersion</key>             <string>1</string>
+    <key>LSMinimumSystemVersion</key>      <string>13.0</string>
+
+    <!-- Агент-приложение: без иконки в доке (совпадает с .accessory в коде) -->
+    <key>LSUIElement</key>                 <true/>
+
+    <!-- Текст, который увидит пользователь в окне запроса геолокации -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Miqat использует вашу геолокацию, чтобы показывать точное время намаза для вашего города.</string>
+
+    <key>NSHumanReadableCopyright</key>    <string>© 2026 vosayll</string>
+</dict>
+</plist>
