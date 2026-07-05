@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Miqat — карта архитектуры</title>
+<style>
+  html,body{margin:0;background:#0B0B0F;color:#F4F2EC;
+    font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;}
+  .wrap{max-width:760px;margin:0 auto;padding:28px 16px 48px;}
+  h1{font-size:20px;font-weight:600;letter-spacing:.02em;margin:0 0 4px;}
+  p.subtitle{color:rgba(244,242,236,.5);font-size:13px;margin:0 0 20px;}
+  svg{width:100%;height:auto;display:block;}
+  .box   { fill:#17171c; stroke:rgba(255,255,255,.14); stroke-width:1.5; }
+  .acc   { fill:#17171c; stroke:#C9A24B; stroke-width:1.8; }
+  .pill  { fill:#202026; stroke:#C9A24B; stroke-width:1.8; }
+  .name  { font-family:ui-monospace,Menlo,monospace; font-weight:600; font-size:15px; fill:#F4F2EC; text-anchor:middle; }
+  .nameA { font-family:ui-monospace,Menlo,monospace; font-weight:600; font-size:15px; fill:#C9A24B; text-anchor:middle; }
+  .sub   { font-size:12px; fill:rgba(244,242,236,.6); text-anchor:middle; }
+  .hdr   { font-size:11px; letter-spacing:2px; fill:rgba(244,242,236,.4); text-anchor:middle; }
+  .flow  { stroke:rgba(244,242,236,.4); stroke-width:1.5; fill:none; marker-end:url(#a); }
+  .dash  { stroke-dasharray:4 3; }
+  .lbl   { font-size:11px; fill:rgba(244,242,236,.4); text-anchor:middle; }
+  .legend{margin-top:22px;font-size:12px;color:rgba(244,242,236,.55);line-height:1.7;}
+  .legend b{color:#C9A24B;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Miqat — карта архитектуры</h1>
+  <p class="subtitle">Два трека сходятся в интерфейсе, который рисует пилюлю у чёлки.</p>
+
+  <svg viewBox="0 0 680 560" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="rgba(244,242,236,.4)"/>
+      </marker>
+    </defs>
+
+    <rect class="acc" x="180" y="20" width="320" height="46" rx="12"/>
+    <text class="nameA" x="340" y="40">MiqatApp</text>
+    <text class="sub"   x="340" y="56">точка входа · запускает всё</text>
+
+    <path class="flow" d="M340,66 L340,82 L185,82 L185,98"/>
+    <path class="flow" d="M340,82 L495,82 L495,98"/>
+    <text class="lbl" x="340" y="78">создаёт</text>
+
+    <text class="hdr" x="185" y="94">ДАННЫЕ</text>
+    <text class="hdr" x="495" y="94">ОКНО / СИСТЕМА</text>
+
+    <rect class="box" x="60" y="100" width="250" height="58" rx="12"/>
+    <text class="name" x="185" y="126">PrayerEngine</text>
+    <text class="sub"  x="185" y="144">времена намаза + Кибла (Adhan)</text>
+
+    <path class="flow" d="M185,158 L185,196"/>
+    <text class="lbl" x="215" y="181">данные</text>
+
+    <rect class="box" x="60" y="196" width="250" height="58" rx="12"/>
+    <text class="name" x="185" y="222">ClockModel</text>
+    <text class="sub"  x="185" y="240">⏱ тик 1 сек · состояние</text>
+
+    <rect class="box" x="370" y="100" width="250" height="58" rx="12"/>
+    <text class="name" x="495" y="126">NotchController</text>
+    <text class="sub"  x="495" y="144">окно у чёлки · наведение</text>
+
+    <path class="flow" d="M495,158 L495,196"/>
+
+    <rect class="box" x="370" y="196" width="250" height="58" rx="12"/>
+    <text class="name" x="495" y="222">CGSSpace</text>
+    <text class="sub"  x="495" y="240">все рабочие столы (Spaces)</text>
+
+    <path class="flow" d="M185,254 L185,338"/>
+    <text class="lbl" x="230" y="300">@Published</text>
+    <path class="flow" d="M495,254 L495,300 L340,300 L340,338"/>
+    <text class="lbl" x="430" y="292">окно + hover</text>
+
+    <rect class="acc" x="120" y="338" width="440" height="60" rx="12"/>
+    <text class="nameA" x="340" y="364">NotchView · SwiftUI</text>
+    <text class="sub"   x="340" y="382">пилюля ↔ панель · список · компас · узор</text>
+
+    <path class="flow" d="M340,398 L340,436"/>
+    <text class="lbl" x="368" y="421">рисует</text>
+
+    <rect class="pill" x="215" y="436" width="250" height="46" rx="23"/>
+    <text class="nameA" x="340" y="456">🌙 Maghrib · 4:32</text>
+    <text class="sub"   x="340" y="472">у чёлки, поверх всех столов</text>
+
+    <rect class="box dash" x="60" y="500" width="250" height="40" rx="10"/>
+    <text class="name" x="185" y="519" style="font-size:13px">Design</text>
+    <text class="sub"  x="185" y="533">общий: цвета + формат времени</text>
+  </svg>
+
+  <div class="legend">
+    <b>Как читать:</b> сверху <b>MiqatApp</b> запускает приложение. Слева поток <b>данных</b>
+    (расчёт времён → состояние), справа <b>окно/система</b> (панель у чёлки + видимость на всех столах).
+    Оба сходятся в <b>NotchView</b> (интерфейс на SwiftUI), который рисует пилюлю у выреза.
+    <b>Design</b> — общий помощник (цвета и формат). Подробности — в ARCHITECTURE.md.
+  </div>
+</div>
+</body>
+</html>

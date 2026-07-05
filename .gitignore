@@ -1,0 +1,8 @@
+# Swift / SPM build artifacts
+.build/
+.swiftpm/
+Package.pins
+
+# macOS
+.DS_Store
+*.xcuserstate
