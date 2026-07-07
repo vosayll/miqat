@@ -2,50 +2,40 @@ import Foundation
 import CoreLocation
 import Adhan
 
-/// Один намаз в конкретный день (абсолютное время).
-struct PrayerSlot: Identifiable {
+/// Один пункт расписания дня (5 намазов + восход) — для чипов и отсчёта.
+struct PrayerChip: Identifiable {
     let id = UUID()
-    let prayer: Prayer
     let name: String
     let time: Date
+    let symbol: String   // SF Symbol
 }
 
 /// Движок расчёта времён намаза.
 ///
-/// Локация теперь динамическая (обновляется геолокацией). Рядом с Грозным —
-/// точная калибровка под муфтият ЧР; в других городах — стандартный метод (MWL).
-/// Выбор метода/города в настройки вынесем позже (M2, шаг 4).
+/// Локация динамическая. Рядом с Грозным — калибровка муфтията ЧР, иначе MWL.
+/// Высокие широты: сначала пробуем угловой расчёт (не портит обычные города),
+/// и только если он не вышел (белые ночи) — фоллбэк на правило «седьмой ночи».
 enum PrayerEngine {
 
-    /// Фоллбэк-локация, пока геолокация не отдала координаты.
     static let grozny = CLLocationCoordinate2D(latitude: 43.3178, longitude: 45.6949)
-
-    /// Текущая локация и город (обновляются из LocationProvider).
     static var coordinate = grozny
     static var cityName = "Грозный"
+    static let madhab: Madhab = .shafi
 
-    static let madhab: Madhab = .shafi          // шафиитский Аср
+    static let names   = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
+    static let symbols = ["sun.horizon.fill", "sunrise.fill", "sun.max.fill",
+                          "sun.min.fill", "sunset.fill", "moon.fill"]
 
-    static let displayNames: [Prayer: String] = [
-        .fajr:    "Fajr",
-        .dhuhr:   "Dhuhr",
-        .asr:     "Asr",
-        .maghrib: "Maghrib",
-        .isha:    "Isha",
-    ]
-
-    private static let ordered: [Prayer] = [.fajr, .dhuhr, .asr, .maghrib, .isha]
     private static var calendar: Calendar { Calendar(identifier: .gregorian) }
 
-    /// Рядом ли с Грозным (~60 км) — тогда применяем калибровку муфтията.
     private static func isNearGrozny(_ c: CLLocationCoordinate2D) -> Bool {
         CLLocation(latitude: c.latitude, longitude: c.longitude)
             .distance(from: CLLocation(latitude: grozny.latitude, longitude: grozny.longitude)) < 60_000
     }
 
-    private static func params() -> CalculationParameters {
+    private static func params(highLat: Bool) -> CalculationParameters {
         if isNearGrozny(coordinate) {
-            // Точная калибровка под таблицу муфтията ЧР.
+            // Точная калибровка под таблицу муфтията ЧР (Грозный не высокоширотный).
             var p = CalculationMethod.other.params
             p.fajrAngle = 14.75
             p.ishaAngle = 15.65
@@ -54,9 +44,9 @@ enum PrayerEngine {
                                               asr: 8, maghrib: 5, isha: 0)
             return p
         } else {
-            // Прочие города — стандартный метод (пока без ручного выбора).
             var p = CalculationMethod.muslimWorldLeague.params
             p.madhab = madhab
+            if highLat { p.highLatitudeRule = .seventhOfTheNight }  // только как фоллбэк
             return p
         }
     }
@@ -64,40 +54,41 @@ enum PrayerEngine {
     private static func prayerTimes(on date: Date) -> PrayerTimes? {
         let comps = calendar.dateComponents([.year, .month, .day], from: date)
         let coords = Coordinates(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        return PrayerTimes(coordinates: coords, date: comps, calculationParameters: params())
+        // 1) обычный угловой расчёт
+        if let pt = PrayerTimes(coordinates: coords, date: comps, calculationParameters: params(highLat: false)) {
+            return pt
+        }
+        // 2) не вышло (белые ночи) → правило высоких широт
+        return PrayerTimes(coordinates: coords, date: comps, calculationParameters: params(highLat: true))
     }
 
-    /// Направление на Киблу (градусы от севера, по часовой).
     static var qiblaDirection: Double {
         Qibla(coordinates: Coordinates(latitude: coordinate.latitude, longitude: coordinate.longitude)).direction
     }
 
-    /// Пять намазов на день, к которому относится `date`.
-    static func slots(on date: Date = Date()) -> [PrayerSlot] {
+    static func chips(on date: Date = Date()) -> [PrayerChip] {
         guard let pt = prayerTimes(on: date) else { return [] }
-        return ordered.map { prayer in
-            PrayerSlot(prayer: prayer, name: displayNames[prayer] ?? "—", time: pt.time(for: prayer))
-        }
+        let times = [pt.fajr, pt.sunrise, pt.dhuhr, pt.asr, pt.maghrib, pt.isha]
+        return (0..<6).map { PrayerChip(name: names[$0], time: times[$0], symbol: symbols[$0]) }
     }
 
-    /// Следующий намаз. После Иши переходим на Фаджр завтрашнего дня.
-    static func next(after now: Date = Date()) -> PrayerSlot? {
-        guard let pt = prayerTimes(on: now) else { return nil }
-        if let np = pt.nextPrayer(at: now) {
-            return PrayerSlot(prayer: np, name: displayNames[np] ?? "—", time: pt.time(for: np))
-        }
+    static func nextChip(after now: Date = Date()) -> PrayerChip? {
+        if let n = chips(on: now).first(where: { $0.time > now }) { return n }
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) ?? now
-        guard let ptTom = prayerTimes(on: tomorrow) else { return nil }
-        return PrayerSlot(prayer: .fajr, name: displayNames[.fajr] ?? "Fajr", time: ptTom.time(for: .fajr))
+        return chips(on: tomorrow).first
     }
 
-    /// Время предыдущего наступившего намаза (для прогресс-кольца).
-    static func previousTime(before now: Date = Date()) -> Date? {
-        guard let pt = prayerTimes(on: now) else { return nil }
-        if let cur = pt.currentPrayer(at: now) {
-            return pt.time(for: cur)
-        }
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: now) ?? now
-        return prayerTimes(on: yesterday)?.time(for: .isha)
+    static func activeIndex(now: Date = Date()) -> Int {
+        let c = chips(on: now)
+        var idx = -1
+        for (i, ch) in c.enumerated() where ch.time <= now { idx = i }
+        return idx >= 0 ? idx : max(0, c.count - 1)
     }
+
+    static func currentStart(before now: Date = Date()) -> Date {
+        if let p = chips(on: now).last(where: { $0.time <= now }) { return p.time }
+        let y = calendar.date(byAdding: .day, value: -1, to: now) ?? now
+        return chips(on: y).last?.time ?? now
+    }
+
 }

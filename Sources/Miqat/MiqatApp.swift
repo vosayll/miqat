@@ -5,6 +5,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let clock = ClockModel()
     private let location = LocationProvider()
+    private let notifications = NotificationScheduler()
     private var controller: NotchController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -22,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.clock.refresh()
         }
         location.start()
+
+        // Локальные напоминания о намазе (на устройстве, оффлайн, бесплатно).
+        clock.onRefresh = { [weak self] in self?.notifications.reschedule() }
+        notifications.requestAuthorization()
     }
 }
 

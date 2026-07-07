@@ -19,8 +19,16 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$NAME"
 cp "$ROOT/packaging/Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/packaging/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
-echo "▶︎ ad-hoc подпись…"
-codesign --force --deep --sign - "$APP"
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep 'Developer ID Application' | head -1 | sed -E 's/.*"(.*)"$/\1/')
+if [ -n "$IDENTITY" ]; then
+  echo "▶︎ подпись Developer ID + hardened runtime:"
+  echo "   $IDENTITY"
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+else
+  echo "▶︎ ad-hoc подпись (Developer ID не найден)…"
+  codesign --force --deep --sign - "$APP"
+fi
 
 echo "✓ готово: $APP"

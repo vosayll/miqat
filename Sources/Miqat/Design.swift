@@ -22,6 +22,12 @@ enum Format {
         return h > 0 ? String(format: "%d:%02d", h, m) : String(format: "%02d:%02d", m, sec)
     }
 
+    /// Отсчёт с секундами: «3:08:59» (ч:мм:сс) или «08:59» (мм:сс).
+    static func hms(_ interval: TimeInterval) -> String {
+        let s = max(0, Int(interval)); let h = s / 3600; let m = (s % 3600) / 60; let sec = s % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%02d:%02d", m, sec)
+    }
+
     static func remaining(_ interval: TimeInterval) -> String {
         let s = max(0, Int(interval)); let h = s / 3600; let m = (s % 3600) / 60
         return h > 0 ? "\(h)h \(m)m remaining" : "\(m)m remaining"

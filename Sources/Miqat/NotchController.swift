@@ -8,23 +8,23 @@ final class NotchState: ObservableObject {
     @Published var notchWidth:  CGFloat = 190
     @Published var notchHeight: CGFloat = 32
     @Published var collapsedSize = CGSize(width: 350, height: 34)
-    @Published var expandedSize  = CGSize(width: 380, height: 440)
+    @Published var expandedSize  = CGSize(width: 430, height: 195)
 }
 
 /// Окно-панель у выреза сверху по центру.
-/// • держится на всех Spaces (через CGSSpace);
-/// • показывается на заблокированном экране (через SkyLight);
-/// • окно ФИКСИРОВАННОГО размера, клики проходят насквозь (ignoresMouseEvents);
-/// • пилюля «вырастает» в панель средствами SwiftUI — плавно, без рывков окна;
-/// • наведение ловим по позиции мыши (глобальный монитор) + гистерезис.
+/// • держится на всех Spaces (CGSSpace) и на локскрине (SkyLight);
+/// • окно фикс. размера, клики проходят насквозь;
+/// • наведение → разворот; КЛИК по островку → смена темы (через мониторы);
+/// • пилюля «вырастает» в карточку средствами SwiftUI.
 final class NotchController {
     private let panel: NSPanel
     private let state = NotchState()
+    private let themeStore = ThemeStore()
     private let clock: ClockModel
-    private let notchSpace = CGSSpace(level: 2147483647)   // все Spaces, макс. уровень
+    private let notchSpace = CGSSpace(level: 2147483647)
 
-    private var moveMonitorGlobal: Any?
-    private var moveMonitorLocal: Any?
+    private var moveMonitor: Any?
+    private var clickMonitor: Any?
     private var closeWorkItem: DispatchWorkItem?
 
     private let collapsedSize: CGSize
@@ -43,14 +43,14 @@ final class NotchController {
             return 190
         }()
 
-        // Ширину пилюли считаем под самое длинное название намаза — чтобы текст не переносился.
-        let names = PrayerEngine.displayNames.values.map { $0.uppercased() }
-        let nameW = names.map { Self.textWidth($0, size: 11, weight: .semibold, tracking: 1.2) }.max() ?? 60
-        let leftCluster  = 12 + 6 + nameW                                   // луна + отступ + название
-        let rightCluster = Self.textWidth("23:59", size: 12, weight: .medium, tracking: 0) + 6 + 12
-        let side = max(leftCluster, rightCluster)                           // симметрично → вырез по центру
-        let collapsed = CGSize(width: nw + 2 * side + 2 * 12 + 8, height: nh)
-        let expanded  = CGSize(width: 380, height: 440)
+        // Ширину пилюли считаем под самое длинное имя намаза — чтобы не переносилось.
+        let nameW = PrayerEngine.names
+            .map { Self.textWidth($0.uppercased(), size: 11, weight: .semibold, tracking: 1.0) }.max() ?? 60
+        let leftCluster  = 12 + 6 + nameW
+        let rightCluster = Self.textWidth("23:59", size: 14, weight: .semibold, tracking: 0) + 8 + 14
+        let side = max(leftCluster, rightCluster)
+        let collapsed = CGSize(width: nw + 2 * side + 2 * 14 + 8, height: nh)
+        let expanded  = CGSize(width: 430, height: 195)
         collapsedSize = collapsed
         expandedSize  = expanded
 
@@ -64,7 +64,7 @@ final class NotchController {
         panel.hasShadow = false
         panel.isMovable = false
         panel.hidesOnDeactivate = false
-        panel.ignoresMouseEvents = true       // клики проходят насквозь; наведение — через монитор
+        panel.ignoresMouseEvents = true
 
         state.notchWidth = nw
         state.notchHeight = nh
@@ -74,6 +74,7 @@ final class NotchController {
         let root = NotchRootView()
             .environmentObject(clock)
             .environmentObject(state)
+            .environmentObject(themeStore)
         let hosting = NSHostingView(rootView: root)
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting
@@ -82,48 +83,38 @@ final class NotchController {
     func show() {
         positionWindow()
         panel.orderFrontRegardless()
-        notchSpace.windows.insert(panel)      // показывать на всех Spaces
-        startMouseTracking()
-        setupLockScreen()                     // показывать на заблокированном экране
+        notchSpace.windows.insert(panel)
+        startTracking()
+        setupLockScreen()
     }
 
-    /// Окно всегда одного размера (развёрнутого) и не двигается — контент рисуется сверху.
     private func positionWindow() {
         guard let screen = NotchController.notchScreen() else { return }
         let sf = screen.frame
         let x = sf.minX + (sf.width - expandedSize.width) / 2
         let y = sf.maxY - expandedSize.height
-        panel.setFrame(NSRect(x: x, y: y, width: expandedSize.width, height: expandedSize.height),
-                       display: true)
+        panel.setFrame(NSRect(x: x, y: y, width: expandedSize.width, height: expandedSize.height), display: true)
     }
 
-    // MARK: - Локскрин (SkyLight)
+    // MARK: - Мониторы мыши: наведение (разворот) + клик (смена темы)
 
-    private func setupLockScreen() {
-        let dnc = DistributedNotificationCenter.default()
-        dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
-            guard let self = self else { return }
-            self.state.expanded = false                       // на локскрине — свёрнутая пилюля
-            SkyLightOperator.shared.delegateWindow(self.panel)
-            self.panel.orderFrontRegardless()
-        }
-        dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
-            guard let self = self else { return }
-            SkyLightOperator.shared.undelegateWindow(self.panel)
-        }
-    }
-
-    // MARK: - Наведение по позиции мыши (без мерцания)
-
-    private func startMouseTracking() {
-        moveMonitorGlobal = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+    private func startTracking() {
+        moveMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             self?.evaluateHover()
         }
-        moveMonitorLocal = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
-            self?.evaluateHover()
-            return event
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
+            self?.handleClick()
         }
         evaluateHover()
+    }
+
+    private func handleClick() {
+        guard let screen = NotchController.notchScreen() else { return }
+        let sf = screen.frame
+        let rect = state.expanded ? openRect(sf) : triggerRect(sf)
+        if rect.contains(NSEvent.mouseLocation) {
+            themeStore.toggle()          // клик по островку = смена темы
+        }
     }
 
     private func openRect(_ sf: NSRect) -> NSRect {
@@ -143,11 +134,7 @@ final class NotchController {
         let mouse = NSEvent.mouseLocation
 
         if state.expanded {
-            if openRect(sf).contains(mouse) {
-                cancelScheduledClose()
-            } else {
-                scheduleClose()
-            }
+            if openRect(sf).contains(mouse) { cancelScheduledClose() } else { scheduleClose() }
         } else if triggerRect(sf).contains(mouse) {
             cancelScheduledClose()
             setExpanded(true)
@@ -175,14 +162,31 @@ final class NotchController {
 
     private func setExpanded(_ v: Bool) {
         guard state.expanded != v else { return }
-        state.expanded = v          // SwiftUI сам анимирует морфинг пилюля↔панель
+        state.expanded = v
     }
+
+    // MARK: - Локскрин (SkyLight)
+
+    private func setupLockScreen() {
+        let dnc = DistributedNotificationCenter.default()
+        dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.state.expanded = false
+            SkyLightOperator.shared.delegateWindow(self.panel)
+            self.panel.orderFrontRegardless()
+        }
+        dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            SkyLightOperator.shared.undelegateWindow(self.panel)
+        }
+    }
+
+    // MARK: - Экран/утилиты
 
     private static func notchScreen() -> NSScreen? {
         NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main
     }
 
-    /// Приблизительная ширина строки с учётом трекинга (для расчёта размера пилюли).
     private static func textWidth(_ s: String, size: CGFloat, weight: NSFont.Weight, tracking: CGFloat) -> CGFloat {
         let w = (s as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: size, weight: weight)]).width
         return ceil(w) + CGFloat(max(0, s.count - 1)) * tracking

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Корень: чёрный контейнер, который плавно «вырастает» из пилюли в панель.
+/// Корень: чёрная пилюля ↔ карточка темы. Плавный морфинг.
 struct NotchRootView: View {
     var body: some View {
         NotchContainer()
@@ -11,203 +11,160 @@ struct NotchRootView: View {
 struct NotchContainer: View {
     @EnvironmentObject var clock: ClockModel
     @EnvironmentObject var state: NotchState
+    @EnvironmentObject var themeStore: ThemeStore
 
     private var size: CGSize { state.expanded ? state.expandedSize : state.collapsedSize }
+    private var theme: Theme { themeStore.theme }
+
+    // Свёрнутая — всегда чёрная (сливается с чёлкой); развёрнутая — цвет темы.
+    private var fill: Color { state.expanded ? theme.surface : .black }
 
     private var shape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 18,
-                               bottomTrailingRadius: 18, topTrailingRadius: 0)
+        UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 20,
+                               bottomTrailingRadius: 20, topTrailingRadius: 0)
     }
 
     var body: some View {
         ZStack(alignment: .top) {
-            shape.fill(Color.black)
-
-            if state.expanded {
-                StarPattern().clipShape(shape).transition(.opacity)
-            }
-
+            shape.fill(fill)
             Group {
-                if state.expanded {
-                    ExpandedPanel().transition(.opacity)
-                } else {
-                    CollapsedPill().transition(.opacity)
-                }
+                if state.expanded { ExpandedCard() } else { CollapsedPill() }
             }
         }
         .frame(width: size.width, height: size.height)
         .clipShape(shape)
         .overlay(shape.stroke(Color.white.opacity(0.06), lineWidth: 1))
-        .animation(.spring(response: 0.4, dampingFraction: 0.86), value: state.expanded)
+        .animation(.spring(response: 0.42, dampingFraction: 0.85), value: state.expanded)
+        .animation(.easeInOut(duration: 0.4), value: themeStore.isDark)
     }
 }
 
-// MARK: - Свёрнутая пилюля (симметрично: вырез строго по центру, текст не переносится)
+// MARK: - Свёрнутая пилюля (всегда чёрная)
 
 struct CollapsedPill: View {
     @EnvironmentObject var clock: ClockModel
     @EnvironmentObject var state: NotchState
-
-    private var timeLeft: TimeInterval { clock.next?.time.timeIntervalSince(clock.now) ?? 0 }
+    @EnvironmentObject var themeStore: ThemeStore
 
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
-                Image(systemName: "moon.fill").font(.system(size: 10)).foregroundStyle(Design.gold)
-                Text(clock.next?.name.uppercased() ?? "—")
-                    .font(.system(size: 11, weight: .semibold)).tracking(1.2)
-                    .foregroundStyle(Design.cream)
+                Image(systemName: "moon.fill").font(.system(size: 11)).foregroundStyle(themeStore.theme.accent)
+                Text((clock.next?.name ?? "—").uppercased())
+                    .font(.system(size: 11, weight: .semibold)).tracking(1.0)
+                    .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1).fixedSize()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Color.clear.frame(width: state.notchWidth)   // зазор под физический вырез
 
-            HStack(spacing: 6) {
-                Text(Format.big(timeLeft))
-                    .font(.system(size: 12, weight: .medium)).monospacedDigit()
-                    .foregroundStyle(Design.cream)
+            HStack(spacing: 8) {
+                Text(Format.big(clock.timeLeft))
+                    .font(.system(size: 14, weight: .semibold)).monospacedDigit()
+                    .foregroundStyle(.white)
                     .lineLimit(1).fixedSize()
-                ProgressRing(progress: clock.progress).frame(width: 12, height: 12)
+                ProgressRing(progress: clock.progress, color: themeStore.theme.accent)
+                    .frame(width: 14, height: 14)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-// MARK: - Развёрнутая панель
+// MARK: - Развёрнутая карточка
 
-struct ExpandedPanel: View {
+struct ExpandedCard: View {
     @EnvironmentObject var clock: ClockModel
     @EnvironmentObject var state: NotchState
+    @EnvironmentObject var themeStore: ThemeStore
 
-    private var timeLeft: TimeInterval { clock.next?.time.timeIntervalSince(clock.now) ?? 0 }
+    private var theme: Theme { themeStore.theme }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 14) {
+            // Шапка: слева имя + крупный таймер, справа город + Хиджра + луна
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("HIJRI").font(.system(size: 9, weight: .semibold)).tracking(3)
-                        .foregroundStyle(Design.gold.opacity(0.7))
-                    Text(Format.hijri(clock.now)).font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Design.cream)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text((clock.next?.name ?? "—").uppercased())
+                        .font(.system(size: 12, weight: .semibold)).tracking(0.5)
+                        .foregroundStyle(theme.sub).lineLimit(1)
+                    Text(Format.hms(clock.timeLeft))
+                        .font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(theme.ink).lineLimit(1).minimumScaleFactor(0.6)
                 }
-                Spacer()
-                HStack(spacing: 4) {
-                    Image(systemName: "location.fill").font(.system(size: 9))
-                        .foregroundStyle(Design.gold.opacity(0.8))
-                    Text(PrayerEngine.cityName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Design.cream).lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(PrayerEngine.cityName)
+                            .font(.system(size: 15, weight: .bold)).foregroundStyle(theme.ink)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                        Text(Format.hijri(clock.now))
+                            .font(.system(size: 11, weight: .medium)).foregroundStyle(theme.sub)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                    }
+                    ZStack {
+                        Circle().strokeBorder(theme.accent.opacity(0.35), lineWidth: 1.5)
+                        Image(systemName: "moon.fill").font(.system(size: 11)).foregroundStyle(theme.accent)
+                    }
+                    .frame(width: 24, height: 24)
                 }
             }
 
-            VStack(spacing: 4) {
-                Text("UNTIL \(clock.next?.name.uppercased() ?? "")")
-                    .font(.system(size: 10, weight: .semibold)).tracking(2.5)
-                    .foregroundStyle(Design.gold)
-                Text(Format.big(timeLeft))
-                    .font(.system(size: 44, weight: .light, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(Design.cream)
-                Text(Format.remaining(timeLeft))
-                    .font(.system(size: 12)).foregroundStyle(Design.cream.opacity(0.45))
-            }
-            .padding(.top, 16)
-
-            VStack(spacing: 2) {
-                ForEach(clock.slots) { slot in
-                    PrayerRow(slot: slot, isNext: slot.prayer == clock.next?.prayer)
+            // Ряд из 6 чипов
+            HStack(spacing: 5) {
+                ForEach(Array(clock.chips.enumerated()), id: \.element.id) { i, chip in
+                    ChipView(chip: chip, active: i == clock.activeIndex, theme: theme)
                 }
             }
-            .padding(.top, 18)
-
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 22)
-        .padding(.top, state.notchHeight + 10)
+        .padding(.horizontal, 18)
+        .padding(.top, state.notchHeight + 8)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 
-struct PrayerRow: View {
-    let slot: PrayerSlot
-    let isNext: Bool
+struct ChipView: View {
+    let chip: PrayerChip
+    let active: Bool
+    let theme: Theme
 
     var body: some View {
-        HStack(spacing: 8) {
-            if isNext {
-                Circle().fill(Design.gold).frame(width: 5, height: 5)
-            }
-            Text(slot.name)
-            Spacer()
-            Text(Format.clock(slot.time)).monospacedDigit()
+        VStack(spacing: 4) {
+            Text(chip.name.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(active ? theme.activeText : theme.sub)
+                .lineLimit(1)
+            Image(systemName: chip.symbol)
+                .font(.system(size: 12))
+                .foregroundStyle(active ? theme.activeText : theme.accent)
+            Text(Format.clock(chip.time))
+                .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                .foregroundStyle(active ? theme.activeText : theme.chipInk)
+                .lineLimit(1)
         }
-        .font(.system(size: 14, weight: isNext ? .semibold : .regular))
-        .foregroundStyle(isNext ? Design.gold : Design.cream.opacity(0.8))
-        .padding(.vertical, 8).padding(.horizontal, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isNext ? Design.gold.opacity(0.12) : Color.clear)
-        )
-        .overlay {
-            if isNext {
-                RoundedRectangle(cornerRadius: 10).stroke(Design.gold.opacity(0.35), lineWidth: 1)
-            }
-        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8).padding(.horizontal, 2)
+        .background(RoundedRectangle(cornerRadius: 11).fill(active ? theme.accent : theme.chipBg))
     }
 }
 
-// MARK: - Мелкие элементы
+// MARK: - Кольцо прогресса
 
 struct ProgressRing: View {
     var progress: Double
+    var color: Color
     var body: some View {
         ZStack {
-            Circle().stroke(Color.white.opacity(0.15), lineWidth: 2)
+            Circle().stroke(Color.white.opacity(0.16), lineWidth: 3)
             Circle().trim(from: 0, to: progress)
-                .stroke(Design.gold, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
-    }
-}
-
-/// Фоновый узор из восьмиконечных звёзд (низкая насыщенность).
-struct StarPattern: View {
-    var body: some View {
-        Canvas { ctx, size in
-            let spacing: CGFloat = 66
-            let radius: CGFloat = 20
-            var row = 0
-            var y: CGFloat = 6
-            while y < size.height + spacing {
-                var x: CGFloat = (row % 2 == 0) ? 10 : 10 + spacing / 2
-                while x < size.width + spacing {
-                    ctx.stroke(Self.star(center: CGPoint(x: x, y: y), radius: radius),
-                               with: .color(Design.gold.opacity(0.10)),
-                               lineWidth: 0.7)
-                    x += spacing
-                }
-                y += spacing; row += 1
-            }
-        }
-        .allowsHitTesting(false)
-    }
-
-    static func star(center: CGPoint, radius: CGFloat) -> Path {
-        var p = Path()
-        let points = 8
-        let inner = Double(radius) * 0.42
-        for i in 0 ..< (points * 2) {
-            let angle = Double(i) * .pi / Double(points) - .pi / 2
-            let r = (i % 2 == 0) ? Double(radius) : inner
-            let pt = CGPoint(x: Double(center.x) + cos(angle) * r,
-                             y: Double(center.y) + sin(angle) * r)
-            if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
-        }
-        p.closeSubpath()
-        return p
     }
 }

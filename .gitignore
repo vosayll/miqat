@@ -1,6 +1,13 @@
 # Swift / SPM build artifacts
 .build/
 Miqat.app/
+packaging/icon_1024.png
+packaging/AppIcon.iconset/
+packaging/signing/
+packaging/dmg_stage/
+Miqat.dmg
+Miqat-*.zip
+.miqat-notarize.zip
 .swiftpm/
 Package.pins
 

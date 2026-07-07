@@ -1,0 +1,65 @@
+import Foundation
+import UserNotifications
+
+/// Локальные напоминания о намазе — на устройстве, оффлайн, бесплатно.
+/// Это НЕ push с сервера: времена считаем сами и планируем уведомления локально.
+final class NotificationScheduler {
+    private let center = UNUserNotificationCenter.current()
+
+    /// Индексы намазов в расписании (без Восхода=1): Fajr, Dhuhr, Asr, Maghrib, Isha.
+    private let prayerIdx = [0, 2, 3, 4, 5]
+
+    /// Спросить разрешение (системный запрос один раз) и запланировать.
+    func requestAuthorization() {
+        center.requestAuthorization(options: [.alert, .sound]) { [weak self] granted, _ in
+            guard granted else { return }
+            DispatchQueue.main.async {
+                self?.confirmEnabled()
+                self?.scheduleNow()
+            }
+        }
+    }
+
+    /// Перепланировать (вызывать при смене намаза/локации). Требует уже выданного разрешения.
+    func reschedule() {
+        center.getNotificationSettings { [weak self] settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            DispatchQueue.main.async { self?.scheduleNow() }
+        }
+    }
+
+    private func scheduleNow() {
+        center.removeAllPendingNotificationRequests()
+        let now = Date()
+        let cal = Calendar(identifier: .gregorian)
+
+        for dayOffset in 0...1 {
+            guard let day = cal.date(byAdding: .day, value: dayOffset, to: now) else { continue }
+            let chips = PrayerEngine.chips(on: day)
+            for i in prayerIdx where i < chips.count {
+                let chip = chips[i]
+                guard chip.time > now else { continue }
+
+                let content = UNMutableNotificationContent()
+                content.title = "🕌 \(chip.name)"
+                content.body = "Время намаза · \(Format.clock(chip.time))"
+                content.sound = .default
+
+                let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: chip.time)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+                center.add(UNNotificationRequest(identifier: "prayer-\(dayOffset)-\(i)",
+                                                 content: content, trigger: trigger))
+            }
+        }
+    }
+
+    /// Разовое подтверждение сразу после включения.
+    private func confirmEnabled() {
+        let content = UNMutableNotificationContent()
+        content.title = "Miqat"
+        content.body = "Напоминания о намазе включены ✓"
+        content.sound = .default
+        center.add(UNNotificationRequest(identifier: "confirm", content: content,
+                                         trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)))
+    }
+}

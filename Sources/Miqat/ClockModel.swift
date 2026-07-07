@@ -1,13 +1,17 @@
 import Foundation
 import Combine
 
-/// Тикает раз в секунду: текущее время, времена намаза, следующий намаз,
-/// прогресс от предыдущего намаза к следующему (для кольца).
+/// Тикает раз в секунду: текущее время, расписание чипов, следующий пункт,
+/// индекс текущего периода и прогресс (для кольца).
 final class ClockModel: ObservableObject {
     @Published var now: Date = Date()
-    @Published var slots: [PrayerSlot] = []
-    @Published var next: PrayerSlot?
+    @Published var chips: [PrayerChip] = []
+    @Published var next: PrayerChip?
+    @Published var activeIndex: Int = 0
     @Published var progress: Double = 0
+
+    /// Вызывается после каждого пересчёта (для перепланирования напоминаний).
+    var onRefresh: (() -> Void)?
 
     private var timer: Timer?
 
@@ -20,6 +24,9 @@ final class ClockModel: ObservableObject {
         timer = t
     }
 
+    /// Сколько осталось до следующего пункта.
+    var timeLeft: TimeInterval { next.map { $0.time.timeIntervalSince(now) } ?? 0 }
+
     private func tick() {
         now = Date()
         if let n = next, now >= n.time {
@@ -31,14 +38,17 @@ final class ClockModel: ObservableObject {
 
     func refresh() {
         now = Date()
-        slots = PrayerEngine.slots(on: now)
-        next = PrayerEngine.next(after: now)
+        chips = PrayerEngine.chips(on: now)
+        next = PrayerEngine.nextChip(after: now)
+        activeIndex = PrayerEngine.activeIndex(now: now)
         updateProgress()
+        onRefresh?()
     }
 
     private func updateProgress() {
-        guard let n = next, let prev = PrayerEngine.previousTime(before: now) else { progress = 0; return }
-        let total = n.time.timeIntervalSince(prev)
-        progress = total > 0 ? min(1, max(0, now.timeIntervalSince(prev) / total)) : 0
+        guard let n = next else { progress = 0; return }
+        let start = PrayerEngine.currentStart(before: now)
+        let total = n.time.timeIntervalSince(start)
+        progress = total > 0 ? min(1, max(0, now.timeIntervalSince(start) / total)) : 0
     }
 }
