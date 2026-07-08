@@ -15,8 +15,12 @@ final class NotchState: ObservableObject {
 /// • держится на всех Spaces (CGSSpace) и на локскрине (SkyLight);
 /// • окно фикс. размера, клики проходят насквозь;
 /// • наведение → разворот; КЛИК по островку → смена темы (через мониторы);
+/// • ПРАВЫЙ клик (или Ctrl+клик) → контекстное меню (скрыть/тема/выход);
+/// • «Скрыть островок» — окно плавно гаснет; возврат — наведением на зону
+///   чёлки или автоматически через 60 секунд (страховка);
 /// • пилюля «вырастает» в карточку средствами SwiftUI.
-final class NotchController {
+/// NSObject — чтобы быть target'ом пунктов NSMenu (селекторы Obj-C).
+final class NotchController: NSObject {
     private let panel: NSPanel
     private let state = NotchState()
     private let themeStore = ThemeStore()
@@ -27,9 +31,15 @@ final class NotchController {
     private var clickMonitor: Any?
     private var closeWorkItem: DispatchWorkItem?
 
+    // Скрытие островка: флаг + отложенный автовозврат (страховка).
+    private var islandHidden = false
+    private var unhideWorkItem: DispatchWorkItem?
+
     private let collapsedSize: CGSize
     private let expandedSize: CGSize
     private let closeDelay: TimeInterval = 0.18
+    private let hideFadeDuration: TimeInterval = 0.25
+    private let autoUnhideDelay: TimeInterval = 60
 
     init(clock: ClockModel) {
         self.clock = clock
@@ -57,6 +67,8 @@ final class NotchController {
         panel = NSPanel(contentRect: NSRect(origin: .zero, size: expanded),
                         styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: false)
+        super.init()
+
         panel.isFloatingPanel = true
         panel.level = .statusBar
         panel.backgroundColor = .clear
@@ -96,24 +108,40 @@ final class NotchController {
         panel.setFrame(NSRect(x: x, y: y, width: expandedSize.width, height: expandedSize.height), display: true)
     }
 
-    // MARK: - Мониторы мыши: наведение (разворот) + клик (смена темы)
+    // MARK: - Мониторы мыши: наведение (разворот) + клик (тема) + правый клик (меню)
 
     private func startTracking() {
         moveMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             self?.evaluateHover()
         }
-        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
-            self?.handleClick()
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self = self else { return }
+            if event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
+                self.handleRightClick()  // правый клик или Ctrl+клик = контекстное меню
+            } else {
+                self.handleClick()
+            }
         }
         evaluateHover()
     }
 
     private func handleClick() {
+        guard !islandHidden else { return }              // скрытый островок клики не ловит
         guard let screen = NotchController.notchScreen() else { return }
         let sf = screen.frame
         let rect = state.expanded ? openRect(sf) : triggerRect(sf)
         if rect.contains(NSEvent.mouseLocation) {
             themeStore.toggle()          // клик по островку = смена темы
+        }
+    }
+
+    private func handleRightClick() {
+        guard !islandHidden else { return }
+        guard let screen = NotchController.notchScreen() else { return }
+        let sf = screen.frame
+        let rect = state.expanded ? openRect(sf) : triggerRect(sf)
+        if rect.contains(NSEvent.mouseLocation) {
+            showContextMenu(at: NSEvent.mouseLocation)
         }
     }
 
@@ -128,10 +156,21 @@ final class NotchController {
                       width: collapsedSize.width, height: h)
     }
 
+    /// Зона пробуждения скрытого островка: полоса у чёлки шириной с пилюлю + запас.
+    private func wakeRect(_ sf: NSRect) -> NSRect {
+        triggerRect(sf).insetBy(dx: -30, dy: 0)
+    }
+
     private func evaluateHover() {
         guard let screen = NotchController.notchScreen() else { return }
         let sf = screen.frame
         let mouse = NSEvent.mouseLocation
+
+        // Островок скрыт: ждём наведения на зону чёлки, чтобы вернуть его.
+        if islandHidden {
+            if wakeRect(sf).contains(mouse) { unhideIsland() }
+            return
+        }
 
         if state.expanded {
             if openRect(sf).contains(mouse) { cancelScheduledClose() } else { scheduleClose() }
@@ -165,12 +204,90 @@ final class NotchController {
         state.expanded = v
     }
 
+    // MARK: - Контекстное меню (правый клик / Ctrl+клик)
+
+    private func showContextMenu(at point: NSPoint) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false    // включённость пунктов задаём вручную
+
+        let hide = NSMenuItem(title: "Скрыть островок", action: #selector(hideIslandAction), keyEquivalent: "")
+        hide.target = self
+        menu.addItem(hide)
+
+        // Смена темы — через существующий ThemeStore; галочка на текущей.
+        let green = NSMenuItem(title: "Тема: Зелёная", action: #selector(selectGreenTheme), keyEquivalent: "")
+        green.target = self
+        green.state = themeStore.isDark ? .off : .on
+        menu.addItem(green)
+
+        let dark = NSMenuItem(title: "Тема: Тёмная", action: #selector(selectDarkTheme), keyEquivalent: "")
+        dark.target = self
+        dark.state = themeStore.isDark ? .on : .off
+        menu.addItem(dark)
+
+        menu.addItem(.separator())
+
+        let settings = NSMenuItem(title: "Настройки…", action: nil, keyEquivalent: "")
+        settings.isEnabled = false       // заглушка: настройки — следующая фича
+        menu.addItem(settings)
+
+        let quit = NSMenuItem(title: "Выйти из Miqat", action: #selector(quitApp), keyEquivalent: "")
+        quit.target = self
+        menu.addItem(quit)
+
+        // Приложение — accessory (без фокуса); активируем, иначе меню не получит клики.
+        NSApp.activate(ignoringOtherApps: true)
+        menu.popUp(positioning: nil, at: point, in: nil)   // in: nil → экранные координаты
+    }
+
+    @objc private func hideIslandAction() { hideIsland() }
+    @objc private func selectGreenTheme() { themeStore.isDark = false }
+    @objc private func selectDarkTheme()  { themeStore.isDark = true }
+    @objc private func quitApp()          { NSApp.terminate(nil) }
+
+    // MARK: - Скрытие/возврат островка
+
+    /// Скрыть: свернуть карточку и плавно погасить окно. Окно остаётся на месте
+    /// (alpha 0) — не трогаем ни CGSSpace, ни SkyLight; клики оно и так не ловит.
+    private func hideIsland() {
+        guard !islandHidden else { return }
+        islandHidden = true
+        cancelScheduledClose()
+        setExpanded(false)               // при возврате покажется пилюля, не карточка
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = hideFadeDuration
+            panel.animator().alphaValue = 0
+        }
+        scheduleAutoUnhide()
+    }
+
+    /// Вернуть: плавно проявить окно (наведение на зону чёлки или страховка).
+    private func unhideIsland() {
+        guard islandHidden else { return }
+        islandHidden = false
+        unhideWorkItem?.cancel()
+        unhideWorkItem = nil
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = hideFadeDuration
+            panel.animator().alphaValue = 1
+        }
+    }
+
+    /// Страховка: через 60 секунд островок возвращается сам в любом случае.
+    /// wallDeadline — чтобы сон машины не отодвигал возврат.
+    private func scheduleAutoUnhide() {
+        let item = DispatchWorkItem { [weak self] in self?.unhideIsland() }
+        unhideWorkItem = item
+        DispatchQueue.main.asyncAfter(wallDeadline: .now() + autoUnhideDelay, execute: item)
+    }
+
     // MARK: - Локскрин (SkyLight)
 
     private func setupLockScreen() {
         let dnc = DistributedNotificationCenter.default()
         dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
             guard let self = self else { return }
+            self.unhideIsland()          // на локскрине островок виден всегда
             self.state.expanded = false
             SkyLightOperator.shared.delegateWindow(self.panel)
             self.panel.orderFrontRegardless()
