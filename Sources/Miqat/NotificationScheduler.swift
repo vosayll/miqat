@@ -28,8 +28,26 @@ final class NotificationScheduler {
         }
     }
 
+    /// Включены ли напоминания (настройка "notifyEnabled", дефолт true).
+    static var enabled: Bool {
+        UserDefaults.standard.object(forKey: "notifyEnabled") as? Bool ?? true
+    }
+
+    /// За сколько минут напоминать (настройка "notifyLeadMinutes", 0–60, дефолт 0).
+    static var leadMinutes: Int {
+        min(60, max(0, UserDefaults.standard.object(forKey: "notifyLeadMinutes") as? Int ?? 0))
+    }
+
+    /// Текст: за 0 минут — «Время намаза», иначе — «Через N мин».
+    static func body(time: Date, lead: Int) -> String {
+        lead == 0 ? "Время намаза · \(Format.clock(time))"
+                  : "Через \(lead) мин · \(Format.clock(time))"
+    }
+
     private func scheduleNow() {
         center.removeAllPendingNotificationRequests()
+        guard Self.enabled else { return }   // выключено в настройках — только чистим
+        let lead = Self.leadMinutes
         let now = Date()
         let cal = Calendar(identifier: .gregorian)
 
@@ -38,14 +56,15 @@ final class NotificationScheduler {
             let chips = PrayerEngine.chips(on: day)
             for i in prayerIdx where i < chips.count {
                 let chip = chips[i]
-                guard chip.time > now else { continue }
+                let fireDate = chip.time.addingTimeInterval(TimeInterval(-lead * 60))
+                guard fireDate > now else { continue }
 
                 let content = UNMutableNotificationContent()
                 content.title = "🕌 \(chip.name)"
-                content.body = "Время намаза · \(Format.clock(chip.time))"
+                content.body = Self.body(time: chip.time, lead: lead)
                 content.sound = .default
 
-                let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: chip.time)
+                let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
                 let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
                 center.add(UNNotificationRequest(identifier: "prayer-\(dayOffset)-\(i)",
                                                  content: content, trigger: trigger))

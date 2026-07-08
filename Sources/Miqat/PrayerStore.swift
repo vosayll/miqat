@@ -15,10 +15,15 @@ final class PrayerStore {
     /// сигнал пересчитать расписание (источник мог смениться с локального на API).
     var onUpdate: (() -> Void)?
 
-    // Параметры расчёта на API (совместимы с Aladhan). Настроек в UI пока нет,
-    // поэтому константы: 3 = Muslim World League (как локальный расчёт), 0 = Shafi.
-    static let method = 3
-    static let school = 0
+    // Параметры расчёта на API — из окна настроек (коды методов — по доке Payde,
+    // совместимы с Aladhan). Дефолты: 3 = Muslim World League, 0 = Shafi.
+    // Смена значения меняет имя файла кеша → старый не подходит, качается новый.
+    static var method: Int {
+        UserDefaults.standard.object(forKey: "calcMethod") as? Int ?? 3
+    }
+    static var school: Int {
+        UserDefaults.standard.object(forKey: "asrSchool") as? Int ?? 0
+    }
 
     private var months: [String: CachedMonth] = [:]   // память: имя файла → месяц
     private var inFlight: Set<String> = []            // что уже качается

@@ -23,9 +23,38 @@ struct PrayerChip: Identifiable {
 enum PrayerEngine {
 
     static let grozny = CLLocationCoordinate2D(latitude: 43.3178, longitude: 45.6949)
-    static var coordinate = grozny
-    static var cityName = "Грозный"
     static let madhab: Madhab = .shafi
+
+    /// Последний GPS-фикс и его город (пишет MiqatApp по данным LocationProvider).
+    /// Хранятся отдельно от эффективных значений — GPS не перетирает ручную локацию.
+    static var gpsCoordinate: CLLocationCoordinate2D?
+    static var gpsCityName: String?
+
+    /// Эффективные координаты: при "autoLocation" == false — ручные из настроек,
+    /// иначе GPS; фоллбэк — Грозный.
+    static var coordinate: CLLocationCoordinate2D {
+        manualCoordinate ?? gpsCoordinate ?? grozny
+    }
+
+    /// Отображаемый город: при ручной локации — "manualCity" (или координаты,
+    /// если город не введён), иначе GPS-город; фоллбэк — Грозный.
+    static var cityName: String {
+        guard let manual = manualCoordinate else { return gpsCityName ?? "Грозный" }
+        let city = (UserDefaults.standard.string(forKey: "manualCity") ?? "")
+            .trimmingCharacters(in: .whitespaces)
+        return city.isEmpty ? String(format: "%.2f, %.2f", manual.latitude, manual.longitude) : city
+    }
+
+    /// Ручная локация из настроек ("autoLocation" == false + "manualLat"/"manualLon").
+    /// (0; 0) — незаполненные поля, а не Гвинейский залив: считаем, что локации нет.
+    private static var manualCoordinate: CLLocationCoordinate2D? {
+        let d = UserDefaults.standard
+        guard d.object(forKey: "autoLocation") as? Bool == false else { return nil }  // дефолт — авто
+        let lat = d.double(forKey: "manualLat")
+        let lon = d.double(forKey: "manualLon")
+        guard abs(lat) <= 90, abs(lon) <= 180, lat != 0 || lon != 0 else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
 
     static let names   = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
     static let symbols = ["sun.horizon.fill", "sunrise.fill", "sun.max.fill",
