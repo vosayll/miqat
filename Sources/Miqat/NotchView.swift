@@ -112,8 +112,6 @@ struct ExpandedCard: View {
                         Image(systemName: "moon.fill").font(.system(size: 11)).foregroundStyle(theme.accent)
                     }
                     .frame(width: 24, height: 24)
-
-                    SettingsGearButton(theme: theme) { state.onOpenSettings?() }
                 }
             }
 
@@ -137,6 +135,11 @@ struct ExpandedCard: View {
             Divider()
             Button("Настройки…") { state.onOpenSettings?() }
             Button("Выйти из Miqat") { state.onQuit?() }
+        }
+        .overlay(alignment: .topTrailing) {
+            SettingsGearButton(theme: theme) { state.onOpenSettings?() }
+                .padding(.top, 8)
+                .padding(.trailing, 14)
         }
     }
 }

@@ -19,7 +19,19 @@ final class SettingsWindowController: NSWindowController {
     /// поэтому без activate окно не станет ключевым.
     func show() {
         guard let window else { return }
-        if !window.isVisible { window.center() }   // по центру экрана при открытии
+        if !window.isVisible {
+            // По центру ВИДИМОЙ области экрана с чёлкой (без меню-бара): center()
+            // смещает высокое окно вверх, и верх уезжал под чёлку.
+            let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
+                ?? window.screen ?? NSScreen.main
+            if let vf = screen?.visibleFrame {
+                let s = window.frame.size
+                window.setFrameOrigin(NSPoint(x: vf.midX - s.width / 2,
+                                              y: vf.midY - s.height / 2))
+            } else {
+                window.center()
+            }
+        }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
