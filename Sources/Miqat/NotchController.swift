@@ -35,6 +35,9 @@ final class NotchController: NSObject {
     private var islandHidden = false
     private var unhideWorkItem: DispatchWorkItem?
 
+    // Окно настроек: одно на приложение, создаётся при первом открытии.
+    private var settingsController: SettingsWindowController?
+
     private let collapsedSize: CGSize
     private let expandedSize: CGSize
     private let closeDelay: TimeInterval = 0.18
@@ -227,8 +230,8 @@ final class NotchController: NSObject {
 
         menu.addItem(.separator())
 
-        let settings = NSMenuItem(title: "Настройки…", action: nil, keyEquivalent: "")
-        settings.isEnabled = false       // заглушка: настройки — следующая фича
+        let settings = NSMenuItem(title: "Настройки…", action: #selector(openSettings), keyEquivalent: "")
+        settings.target = self
         menu.addItem(settings)
 
         let quit = NSMenuItem(title: "Выйти из Miqat", action: #selector(quitApp), keyEquivalent: "")
@@ -244,6 +247,14 @@ final class NotchController: NSObject {
     @objc private func selectGreenTheme() { themeStore.isDark = false }
     @objc private func selectDarkTheme()  { themeStore.isDark = true }
     @objc private func quitApp()          { NSApp.terminate(nil) }
+
+    /// Открыть (или поднять уже открытое) окно настроек.
+    @objc private func openSettings() {
+        if settingsController == nil {
+            settingsController = SettingsWindowController(themeStore: themeStore)
+        }
+        settingsController?.show()
+    }
 
     // MARK: - Скрытие/возврат островка
 
