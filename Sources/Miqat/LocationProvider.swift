@@ -25,6 +25,9 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Спросить разрешение и (если дадут) получить координаты.
     func start() {
         manager.requestWhenInUseAuthorization()
+        // На macOS сам по себе requestWhenInUseAuthorization может не показать
+        // окно запроса — старт обновлений подталкивает систему спросить.
+        manager.startUpdatingLocation()
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

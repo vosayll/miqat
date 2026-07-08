@@ -24,6 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         location.start()
 
+        // Календарь с API скачался → пересчитать расписание (источник мог
+        // смениться с локального расчёта на API-кеш).
+        PrayerStore.shared.onUpdate = { [weak self] in self?.clock.refresh() }
+
         // Локальные напоминания о намазе (на устройстве, оффлайн, бесплатно).
         clock.onRefresh = { [weak self] in self?.notifications.reschedule() }
         notifications.requestAuthorization()

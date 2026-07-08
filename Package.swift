@@ -18,5 +18,11 @@ let package = Package(
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ]
         ),
+        // Тесты разбора ответов API времён намаза (фикстуры — реальные ответы).
+        .testTarget(
+            name: "MiqatTests",
+            dependencies: ["Miqat"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )
