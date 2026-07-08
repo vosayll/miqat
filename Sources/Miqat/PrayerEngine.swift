@@ -12,7 +12,12 @@ struct PrayerChip: Identifiable {
 
 /// Движок расчёта времён намаза.
 ///
-/// Локация динамическая. Рядом с Грозным — калибровка муфтията ЧР, иначе MWL.
+/// Источники — цепочкой (ключ UserDefaults "prayerSource": "auto" | "api" | "local"):
+/// при "auto"/"api" сначала кеш HTTP API (PrayerStore), нет кеша на дату —
+/// локальный расчёт Adhan; при "local" — только локальный. Поверх любого
+/// источника применяются ручные поправки из UserDefaults "prayerOffsets".
+///
+/// Локальный расчёт: рядом с Грозным — калибровка муфтията ЧР, иначе MWL.
 /// Высокие широты: сначала пробуем угловой расчёт (не портит обычные города),
 /// и только если он не вышел (белые ночи) — фоллбэк на правило «седьмой ночи».
 enum PrayerEngine {
@@ -67,9 +72,30 @@ enum PrayerEngine {
     }
 
     static func chips(on date: Date = Date()) -> [PrayerChip] {
-        guard let pt = prayerTimes(on: date) else { return [] }
-        let times = [pt.fajr, pt.sunrise, pt.dhuhr, pt.asr, pt.maghrib, pt.isha]
-        return (0..<6).map { PrayerChip(name: names[$0], time: times[$0], symbol: symbols[$0]) }
+        guard let times = sourceTimes(on: date) else { return [] }
+        let offsets = manualOffsets
+        return (0..<6).map { i in
+            let shift = TimeInterval((offsets[names[i]] ?? 0) * 60)
+            return PrayerChip(name: names[i], time: times[i].addingTimeInterval(shift), symbol: symbols[i])
+        }
+    }
+
+    /// Цепочка источников: API-кеш (при "auto"/"api") → локальный Adhan (запасной всегда).
+    private static func sourceTimes(on date: Date) -> [Date]? {
+        let source = UserDefaults.standard.string(forKey: "prayerSource") ?? "auto"
+        if source != "local",
+           let api = PrayerStore.shared.times(on: date, coordinate: coordinate) {
+            return api
+        }
+        guard let pt = prayerTimes(on: date) else { return nil }
+        return [pt.fajr, pt.sunrise, pt.dhuhr, pt.asr, pt.maghrib, pt.isha]
+    }
+
+    /// Ручные поправки «имя намаза → ±минуты» (UserDefaults "prayerOffsets") —
+    /// применяются поверх любого источника; по умолчанию пусто. UI будет позже.
+    private static var manualOffsets: [String: Int] {
+        (UserDefaults.standard.dictionary(forKey: "prayerOffsets") ?? [:])
+            .compactMapValues { $0 as? Int }
     }
 
     static func nextChip(after now: Date = Date()) -> PrayerChip? {
