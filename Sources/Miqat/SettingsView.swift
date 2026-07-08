@@ -25,6 +25,12 @@ struct SettingsView: View {
     @AppStorage("notifyEnabled")     private var notifyEnabled = true
     @AppStorage("notifyLeadMinutes") private var notifyLeadMinutes = 0
 
+    // Ежедневный салават Пророку ﷺ.
+    @AppStorage("salawatEnabled") private var salawatEnabled = true
+    @AppStorage("salawatHour")    private var salawatHour = 13
+    @AppStorage("salawatMinute")  private var salawatMinute = 0
+    @AppStorage("salawatKahf")    private var salawatKahf = true
+
     // Поправки времён — словарь, @AppStorage его не умеет: своя обёртка.
     @StateObject private var offsets = PrayerOffsets()
 
@@ -93,6 +99,13 @@ struct SettingsView: View {
                 .disabled(!notifyEnabled)
             }
 
+            Section("Салават") {
+                Toggle("Ежедневный салават Пророку ﷺ", isOn: $salawatEnabled)
+                Toggle("Пятница: сура «Аль-Кахф»", isOn: $salawatKahf)
+                DatePicker("Время", selection: salawatTimeBinding, displayedComponents: .hourAndMinute)
+                    .disabled(!salawatEnabled && !salawatKahf)
+            }
+
             Section("Оформление") {
                 Picker("Тема", selection: $themeStore.isDark) {
                     Text("Зелёная").tag(false)
@@ -102,6 +115,18 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 620)
+    }
+
+    /// Время салавата как Date для DatePicker (храним час/минуту отдельно).
+    private var salawatTimeBinding: Binding<Date> {
+        Binding(
+            get: { Calendar.current.date(bySettingHour: salawatHour, minute: salawatMinute, second: 0, of: Date()) ?? Date() },
+            set: {
+                let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                salawatHour = c.hour ?? 13
+                salawatMinute = c.minute ?? 0
+            }
+        )
     }
 
     /// «+5» / «−3» / «0» — чтобы поправка читалась с одного взгляда.
