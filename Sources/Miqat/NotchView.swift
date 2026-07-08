@@ -112,6 +112,8 @@ struct ExpandedCard: View {
                         Image(systemName: "moon.fill").font(.system(size: 11)).foregroundStyle(theme.accent)
                     }
                     .frame(width: 24, height: 24)
+
+                    SettingsGearButton(theme: theme) { state.onOpenSettings?() }
                 }
             }
 
@@ -126,6 +128,16 @@ struct ExpandedCard: View {
         .padding(.top, state.notchHeight + 8)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .contentShape(Rectangle())
+        .onHover { state.onCardHover?($0) }
+        .contextMenu {
+            Button("Скрыть островок") { state.onHide?() }
+            Divider()
+            Button(themeStore.isDark ? "Тема: Зелёная" : "Тема: Тёмная") { themeStore.toggle() }
+            Divider()
+            Button("Настройки…") { state.onOpenSettings?() }
+            Button("Выйти из Miqat") { state.onQuit?() }
+        }
     }
 }
 
@@ -166,5 +178,27 @@ struct ProgressRing: View {
                 .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
+    }
+}
+
+// MARK: - Кнопка настроек (шестерёнка в углу карточки)
+
+struct SettingsGearButton: View {
+    let theme: Theme
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(hover ? theme.ink : theme.sub)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(theme.chipBg).opacity(hover ? 1 : 0))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help("Настройки")
     }
 }

@@ -9,11 +9,17 @@ final class NotchState: ObservableObject {
     @Published var notchHeight: CGFloat = 32
     @Published var collapsedSize = CGSize(width: 350, height: 34)
     @Published var expandedSize  = CGSize(width: 430, height: 195)
+
+    // Действия развёрнутой карточки — проставляет NotchController (см. init).
+    var onOpenSettings: (() -> Void)?
+    var onHide: (() -> Void)?
+    var onQuit: (() -> Void)?
+    var onCardHover: ((Bool) -> Void)?   // мышь над карточкой: держать/сворачивать
 }
 
 /// Окно-панель у выреза сверху по центру.
 /// • держится на всех Spaces (CGSSpace) и на локскрине (SkyLight);
-/// • окно фикс. размера, клики проходят насквозь;
+/// • пилюля — клики насквозь; развёрнутая карточка ловит клики (шестерёнка→настройки);
 /// • наведение → разворот; КЛИК по островку → смена темы (через мониторы);
 /// • ПРАВЫЙ клик (или Ctrl+клик) → контекстное меню (скрыть/тема/выход);
 /// • «Скрыть островок» — окно плавно гаснет; возврат — наведением на зону
@@ -85,6 +91,14 @@ final class NotchController: NSObject {
         state.notchHeight = nh
         state.collapsedSize = collapsed
         state.expandedSize = expanded
+
+        // Действия карточки → в контроллер (weak — без цикла удержания).
+        state.onOpenSettings = { [weak self] in self?.openSettings() }
+        state.onHide         = { [weak self] in self?.hideIsland() }
+        state.onQuit         = { NSApp.terminate(nil) }
+        state.onCardHover    = { [weak self] over in
+            if over { self?.cancelScheduledClose() } else { self?.scheduleClose() }
+        }
 
         let root = NotchRootView()
             .environmentObject(clock)
@@ -205,6 +219,9 @@ final class NotchController: NSObject {
     private func setExpanded(_ v: Bool) {
         guard state.expanded != v else { return }
         state.expanded = v
+        // Развёрнутая карточка ловит клики (не проваливаются назад); пилюля —
+        // сквозная, чтобы не перехватывать клики у чёлки/меню-бара.
+        panel.ignoresMouseEvents = !v
     }
 
     // MARK: - Контекстное меню (правый клик / Ctrl+клик)
