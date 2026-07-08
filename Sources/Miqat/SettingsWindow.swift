@@ -20,6 +20,10 @@ final class SettingsWindowController: NSWindowController {
     func show() {
         guard let window else { return }
         if !window.isVisible {
+            // При ПЕРВОМ открытии окно ещё не разложено — frame.size неверный,
+            // и центрирование уводило окно под чёлку. Фиксируем размер контента
+            // (как в SettingsView) до вычисления центра.
+            window.setContentSize(NSSize(width: 480, height: 620))
             // По центру ВИДИМОЙ области экрана с чёлкой (без меню-бара): center()
             // смещает высокое окно вверх, и верх уезжал под чёлку.
             let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })

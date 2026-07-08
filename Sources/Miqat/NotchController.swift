@@ -49,6 +49,10 @@ final class NotchController: NSObject {
     private let closeDelay: TimeInterval = 0.18
     private let hideFadeDuration: TimeInterval = 0.25
     private let autoUnhideDelay: TimeInterval = 60
+    // Запас над верхней кромкой экрана: чтобы наведение на самый верх (кромка
+    // шторки, зона камеры/чёлки) считалось попаданием, а не «мимо» — NSRect
+    // не включает верхнюю границу, а курсор там сидит ровно на maxY.
+    private let topOverscan: CGFloat = 8
 
     init(clock: ClockModel) {
         self.clock = clock
@@ -164,13 +168,13 @@ final class NotchController: NSObject {
 
     private func openRect(_ sf: NSRect) -> NSRect {
         NSRect(x: sf.midX - expandedSize.width / 2, y: sf.maxY - expandedSize.height,
-               width: expandedSize.width, height: expandedSize.height)
+               width: expandedSize.width, height: expandedSize.height + topOverscan)
     }
 
     private func triggerRect(_ sf: NSRect) -> NSRect {
         let h = collapsedSize.height + 6
         return NSRect(x: sf.midX - collapsedSize.width / 2, y: sf.maxY - h,
-                      width: collapsedSize.width, height: h)
+                      width: collapsedSize.width, height: h + topOverscan)
     }
 
     /// Зона пробуждения скрытого островка: полоса у чёлки шириной с пилюлю + запас.

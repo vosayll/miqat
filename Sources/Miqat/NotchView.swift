@@ -127,6 +127,7 @@ struct ExpandedCard: View {
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .contentShape(Rectangle())
+        .onTapGesture { themeStore.toggle() }   // клик по карточке = смена темы
         .onHover { state.onCardHover?($0) }
         .contextMenu {
             Button("Скрыть островок") { state.onHide?() }
