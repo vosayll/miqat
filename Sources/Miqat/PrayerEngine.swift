@@ -123,7 +123,10 @@ enum PrayerEngine {
     /// Цепочка источников: API-кеш (при "auto"/"api") → локальный Adhan (запасной всегда).
     private static func sourceTimes(on date: Date) -> [Date]? {
         let source = UserDefaults.standard.string(forKey: "prayerSource") ?? "auto"
-        if source != "local",
+        // В «авто» рядом с Грозным берём выверенную ЛОКАЛЬНУЮ калибровку муфтията
+        // ЧР — она совпадает с расписанием муфтията точнее любого онлайн-метода.
+        let preferLocalGrozny = (source == "auto") && isNearGrozny(coordinate)
+        if source != "local", !preferLocalGrozny,
            let api = PrayerStore.shared.times(on: date, coordinate: coordinate) {
             return api
         }

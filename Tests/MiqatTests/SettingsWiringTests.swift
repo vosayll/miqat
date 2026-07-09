@@ -24,17 +24,17 @@ final class SettingsWiringTests: XCTestCase {
 
     // MARK: - Метод и мазхаб для Aladhan
 
-    /// Дефолт — авто: без региона фолбэк ДУМ России (14) + шафии (0).
+    /// Дефолт — авто: без региона фолбэк MWL (3) + шафии (0).
     func testMethodDefaultsAuto() {
-        XCTAssertEqual(PrayerStore.method, 14)
+        XCTAssertEqual(PrayerStore.method, 3)
         XCTAssertEqual(PrayerStore.school, 0)
     }
 
-    /// Авто по региону (GPS): Кавказ → 14/шафии, Казань → 14/ханафи, Стамбул → 13.
+    /// Авто по региону (GPS): Кавказ → 3/шафии, Казань → 3/ханафи, Стамбул → 13.
     func testMethodAutoByRegion() {
         PrayerEngine.gpsCountryCode = "RU"
         PrayerEngine.gpsAdminArea = "Chechnya"
-        XCTAssertEqual(PrayerStore.method, 14)
+        XCTAssertEqual(PrayerStore.method, 3)
         XCTAssertEqual(PrayerStore.school, 0)
 
         PrayerEngine.gpsAdminArea = "Republic of Tatarstan"
@@ -64,7 +64,7 @@ final class SettingsWiringTests: XCTestCase {
         PrayerEngine.gpsCountryCode = "RU"
         PrayerEngine.gpsAdminArea = "Chechnya"
         let grozny = name()
-        XCTAssertEqual(grozny, "calendar_43.32_45.69_m14_s0_2026-07.json")
+        XCTAssertEqual(grozny, "calendar_43.32_45.69_m3_s0_2026-07.json")
         PrayerEngine.gpsCountryCode = "TR"
         PrayerEngine.gpsAdminArea = nil
         XCTAssertNotEqual(grozny, name())       // метод сменился → другой файл

@@ -14,10 +14,9 @@ struct PrayerMethodChoice: Equatable {
 enum PrayerMethod {
 
     /// Дефолт, когда страну определить не удалось. Основная аудитория — РФ.
-    static let fallback = PrayerMethodChoice(method: 14, school: 0)
+    static let fallback = PrayerMethodChoice(method: 3, school: 0)
 
     // Коды методов Aladhan (сверено на /v1/methods).
-    private static let RUSSIA = 14   // ДУМ России (Фаджр 16° / Иша 15°)
     private static let TURKEY = 13   // Diyanet
     private static let MAKKAH = 4    // Умм аль-Кура
     private static let EGYPT  = 5    // Египетское управление
@@ -31,7 +30,7 @@ enum PrayerMethod {
     /// Регионы Северного Кавказа, где преобладает шафиитский мазхаб.
     /// Сверяем с CLPlacemark.administrativeArea (нормализуем регистр/пробелы).
     private static let caucasusShafiiKeywords: [String] = [
-        "чечен", "chechn",              // Чечня
+        "чеч", "chech",                 // Чечня / Chechnya / Chechen
         "дагестан", "dagestan",         // Дагестан
         "ингушет", "ingush",            // Ингушетия
         "кабардино", "kabardino",       // Кабардино-Балкария
@@ -50,9 +49,11 @@ enum PrayerMethod {
         guard let code = countryCode?.uppercased() else { return fallback }
         switch code {
         case "RU":
-            // Метод один (ДУМ России), мазхаб — по региону.
+            // РФ по умолчанию — MWL (18°/17°): совпадает с большинством росс.
+            // муфтиятов и приложений (Москва и др.). Грозный/Кавказ с выверенным
+            // расписанием считаются локальной калибровкой отдельно (PrayerEngine).
             let school = isCaucasusShafii(administrativeArea) ? 0 : 1
-            return PrayerMethodChoice(method: RUSSIA, school: school)
+            return PrayerMethodChoice(method: MWL, school: school)
         case "TR": return PrayerMethodChoice(method: TURKEY, school: 0)
         case "SA": return PrayerMethodChoice(method: MAKKAH, school: 0)
         case "EG": return PrayerMethodChoice(method: EGYPT,  school: 0)

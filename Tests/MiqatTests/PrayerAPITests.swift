@@ -88,23 +88,23 @@ final class PrayerAPITests: XCTestCase {
     // MARK: - Карта регион → метод (PrayerMethod)
 
     func testMethodMapRussiaByRegion() {
-        // Кавказ → шафии (school 0), метод ДУМ России (14).
+        // Кавказ → шафии (school 0); метод РФ по умолчанию — MWL (3).
         for area in ["Chechnya", "Республика Дагестан", "Ingushetia",
                      "Kabardino-Balkar Republic", "Karachay-Cherkess Republic",
                      "North Ossetia", "Republic of Adygea"] {
             let c = PrayerMethod.choice(countryCode: "RU", administrativeArea: area)
-            XCTAssertEqual(c.method, 14, "\(area)")
+            XCTAssertEqual(c.method, 3, "\(area)")
             XCTAssertEqual(c.school, 0, "Кавказ шафии: \(area)")
         }
         // Остальная Россия → ханафи (school 1).
         for area in ["Moscow", "Республика Татарстан", "Bashkortostan"] {
             let c = PrayerMethod.choice(countryCode: "RU", administrativeArea: area)
-            XCTAssertEqual(c.method, 14)
+            XCTAssertEqual(c.method, 3)
             XCTAssertEqual(c.school, 1, "не-Кавказ ханафи: \(area)")
         }
-        // Регион неизвестен → метод 14, фолбэк-мазхаб шафии.
+        // Регион неизвестен → метод 3 (MWL), фолбэк-мазхаб шафии.
         let unknown = PrayerMethod.choice(countryCode: "RU", administrativeArea: nil)
-        XCTAssertEqual(unknown, PrayerMethodChoice(method: 14, school: 0))
+        XCTAssertEqual(unknown, PrayerMethodChoice(method: 3, school: 0))
     }
 
     func testMethodMapCountries() {
@@ -120,9 +120,9 @@ final class PrayerAPITests: XCTestCase {
         // Прочие страны → MWL (3), шафии.
         XCTAssertEqual(PrayerMethod.choice(countryCode: "DE", administrativeArea: nil),
                        PrayerMethodChoice(method: 3, school: 0))
-        // Страна неизвестна → фолбэк ДУМ России (основная аудитория).
+        // Страна неизвестна → фолбэк MWL (3).
         XCTAssertEqual(PrayerMethod.choice(countryCode: nil, administrativeArea: nil),
-                       PrayerMethodChoice(method: 14, school: 0))
+                       PrayerMethodChoice(method: 3, school: 0))
     }
 
     // MARK: - Кеш
