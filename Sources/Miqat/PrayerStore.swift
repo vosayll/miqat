@@ -15,15 +15,13 @@ final class PrayerStore {
     /// сигнал пересчитать расписание (источник мог смениться с локального на API).
     var onUpdate: (() -> Void)?
 
-    // Параметры расчёта на API — из окна настроек (коды методов — по доке Payde,
-    // совместимы с Aladhan). Дефолты: 3 = Muslim World League, 0 = Shafi.
-    // Смена значения меняет имя файла кеша → старый не подходит, качается новый.
-    static var method: Int {
-        UserDefaults.standard.object(forKey: "calcMethod") as? Int ?? 3
-    }
-    static var school: Int {
-        UserDefaults.standard.object(forKey: "asrSchool") as? Int ?? 0
-    }
+    // Параметры расчёта для Aladhan — коды методов /v1/methods. Берутся из
+    // PrayerEngine.effectiveMethod: при "methodAuto" (дефолт) — из карты
+    // регион→метод (PrayerMethod) по стране/региону, иначе — из явных настроек
+    // "calcMethod"/"asrSchool". Смена значения меняет имя файла кеша → старый
+    // не подходит, качается новый.
+    static var method: Int { PrayerEngine.effectiveMethod.method }
+    static var school: Int { PrayerEngine.effectiveMethod.school }
 
     private var months: [String: CachedMonth] = [:]   // память: имя файла → месяц
     private var inFlight: Set<String> = []            // что уже качается
@@ -79,7 +77,7 @@ final class PrayerStore {
 
         Task { @MainActor [weak self] in
             defer { self?.inFlight.remove(name) }
-            guard let days = try? await PrayerAPI.fetchCalendar(
+            guard let days = try? await AladhanAPI.fetchCalendar(
                 latitude: lat, longitude: lon, year: year, month: month,
                 timezone: timezone, method: Self.method, school: Self.school
             ), !days.isEmpty else { return }   // ошибки сети — тихо в фолбэк

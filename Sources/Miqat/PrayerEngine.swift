@@ -30,6 +30,17 @@ enum PrayerEngine {
     static var gpsCoordinate: CLLocationCoordinate2D?
     static var gpsCityName: String?
 
+    /// Страна/регион по reverse-geocode (для выбора метода «по региону»).
+    /// gps* — из GPS-фикса, manual* — из геокода ручных координат.
+    static var gpsCountryCode: String?
+    static var gpsAdminArea: String?
+    static var manualCountryCode: String?
+    static var manualAdminArea: String?
+
+    /// Эффективные страна/регион под текущую локацию (ручная перебивает GPS).
+    static var countryCode: String? { manualCoordinate != nil ? manualCountryCode : gpsCountryCode }
+    static var adminArea: String?    { manualCoordinate != nil ? manualAdminArea   : gpsAdminArea }
+
     /// Эффективные координаты: при "autoLocation" == false — ручные из настроек,
     /// иначе GPS; фоллбэк — Грозный.
     static var coordinate: CLLocationCoordinate2D {
@@ -144,6 +155,26 @@ enum PrayerEngine {
         if let p = chips(on: now).last(where: { $0.time <= now }) { return p.time }
         let y = calendar.date(byAdding: .day, value: -1, to: now) ?? now
         return chips(on: y).last?.time ?? now
+    }
+
+    // MARK: - Разрешение метода/мазхаба для онлайн-источника (Aladhan)
+
+    /// Метод авто? (UserDefaults "methodAuto", дефолт true.) При авто метод и
+    /// мазхаб берутся из карты PrayerMethod по стране/региону текущей локации;
+    /// при выключенном авто — из явных настроек "calcMethod"/"asrSchool".
+    static var methodAuto: Bool {
+        UserDefaults.standard.object(forKey: "methodAuto") as? Bool ?? true
+    }
+
+    /// Эффективная пара (метод, мазхаб) для запроса к Aladhan и ключа кеша.
+    static var effectiveMethod: PrayerMethodChoice {
+        if methodAuto {
+            return PrayerMethod.choice(countryCode: countryCode, administrativeArea: adminArea)
+        }
+        let d = UserDefaults.standard
+        let method = d.object(forKey: "calcMethod") as? Int ?? PrayerMethod.fallback.method
+        let school = d.object(forKey: "asrSchool")  as? Int ?? PrayerMethod.fallback.school
+        return PrayerMethodChoice(method: method, school: school)
     }
 
 }

@@ -10,8 +10,13 @@ struct SettingsView: View {
     // Источник времён: auto | api | local (читает движок расчёта).
     @AppStorage("prayerSource") private var prayerSource = "auto"
 
+    // Метод по региону автоматически (дефолт) — метод/мазхаб берутся из карты
+    // регион→метод. Если выключить — используются явные calcMethod/asrSchool.
+    @AppStorage("methodAuto") private var methodAuto = true
+
     // Метод расчёта (коды Aladhan) и мазхаб для Асра (0 — Шафии, 1 — Ханафи).
-    @AppStorage("calcMethod") private var calcMethod = 3
+    // Дефолт — ДУМ России (14), основная аудитория.
+    @AppStorage("calcMethod") private var calcMethod = 14
     @AppStorage("asrSchool")  private var asrSchool = 0
 
     // Местоположение: авто (CoreLocation) или вручную.
@@ -34,21 +39,23 @@ struct SettingsView: View {
     // Поправки времён — словарь, @AppStorage его не умеет: своя обёртка.
     @StateObject private var offsets = PrayerOffsets()
 
-    /// Методы расчёта: код Aladhan → название.
+    /// Методы расчёта: код Aladhan (/v1/methods) → название.
     private struct Method: Identifiable { let id: Int; let name: String }
     private static let methods: [Method] = [
+        .init(id: 14, name: "ДУМ России"),
         .init(id: 3,  name: "MWL — Всемирная исламская лига"),
-        .init(id: 2,  name: "ISNA — Северная Америка"),
         .init(id: 4,  name: "Умм аль-Кура — Мекка"),
         .init(id: 5,  name: "Египетское управление"),
-        .init(id: 1,  name: "Университет Карачи"),
-        .init(id: 8,  name: "Дубай"),
-        .init(id: 9,  name: "Moonsighting Committee"),
-        .init(id: 10, name: "Кувейт"),
-        .init(id: 11, name: "Катар"),
-        .init(id: 12, name: "Сингапур"),
         .init(id: 13, name: "Турция (Diyanet)"),
-        .init(id: 14, name: "Тегеран"),
+        .init(id: 2,  name: "ISNA — Северная Америка"),
+        .init(id: 1,  name: "Университет Карачи"),
+        .init(id: 7,  name: "Тегеран"),
+        .init(id: 16, name: "Дубай"),
+        .init(id: 8,  name: "Персидский залив"),
+        .init(id: 9,  name: "Кувейт"),
+        .init(id: 10, name: "Катар"),
+        .init(id: 11, name: "Сингапур"),
+        .init(id: 15, name: "Moonsighting Committee"),
     ]
 
     var body: some View {
@@ -62,13 +69,16 @@ struct SettingsView: View {
             }
 
             Section("Метод расчёта") {
+                Toggle("Авто (по региону)", isOn: $methodAuto)
                 Picker("Метод", selection: $calcMethod) {
                     ForEach(Self.methods) { Text($0.name).tag($0.id) }
                 }
+                .disabled(methodAuto)
                 Picker("Мазхаб (Аср)", selection: $asrSchool) {
                     Text("Шафиитский").tag(0)
                     Text("Ханафитский").tag(1)
                 }
+                .disabled(methodAuto)
             }
 
             Section("Местоположение") {

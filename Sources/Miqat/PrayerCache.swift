@@ -1,5 +1,26 @@
 import Foundation
 
+/// Один день расписания (внутренняя модель проекта, не привязана к формату API).
+/// Времена — чистые "HH:mm" в таймзоне месяца. Codable — этой же структурой
+/// пишем дисковый кеш. AladhanAPI маппит свой ответ в неё.
+struct CalendarDay: Codable {
+    let date: String        // "2026-07-01" (YYYY-MM-DD)
+    let fajr: String        // "02:02"
+    let sunrise: String
+    let dhuhr: String
+    let asr: String
+    let maghrib: String
+    let isha: String
+    let hijri: String?      // "24-01-1448" (DD-MM-YYYY) — из Aladhan, опц.
+
+    init(date: String, fajr: String, sunrise: String, dhuhr: String,
+         asr: String, maghrib: String, isha: String, hijri: String? = nil) {
+        self.date = date; self.fajr = fajr; self.sunrise = sunrise
+        self.dhuhr = dhuhr; self.asr = asr; self.maghrib = maghrib
+        self.isha = isha; self.hijri = hijri
+    }
+}
+
 /// Кешированный месячный календарь с API — то, что лежит на диске.
 struct CachedMonth: Codable {
     let latitude: Double     // округлено до 2 знаков — GPS-дрожание не сбрасывает кеш
