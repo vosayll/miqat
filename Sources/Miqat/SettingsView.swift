@@ -15,15 +15,25 @@ struct SettingsView: View {
     @AppStorage("methodAuto") private var methodAuto = true
 
     // Метод расчёта (коды Aladhan) и мазхаб для Асра (0 — Шафии, 1 — Ханафи).
-    // Дефолт — ДУМ России (14), основная аудитория.
-    @AppStorage("calcMethod") private var calcMethod = 14
-    @AppStorage("asrSchool")  private var asrSchool = 0
+    // Дефолты совпадают с PrayerMethod.fallback — иначе пикер показывал бы
+    // не тот метод, который реально использует движок при незаполненном ключе.
+    @AppStorage("calcMethod") private var calcMethod = PrayerMethod.fallback.method
+    @AppStorage("asrSchool")  private var asrSchool = PrayerMethod.fallback.school
 
     // Местоположение: авто (CoreLocation) или вручную.
     @AppStorage("autoLocation") private var autoLocation = true
     @AppStorage("manualLat")    private var manualLat = 0.0
     @AppStorage("manualLon")    private var manualLon = 0.0
     @AppStorage("manualCity")   private var manualCity = ""
+
+    // Координаты редактируются как текст: системный формат (.number) в русской
+    // локали ждёт запятую и группирует разряды пробелами («55.5754» → «55 453 4»).
+    // Парсим сами (точка и запятая равноправны), в хранилище пишем по Enter /
+    // уходу фокуса — иначе геокодер MiqatApp поедет на полунабранные координаты.
+    @State private var latText = ""
+    @State private var lonText = ""
+    private enum CoordField { case lat, lon }
+    @FocusState private var coordFocus: CoordField?
 
     // Уведомления. 0 минут = ровно во время намаза (текущее поведение
     // NotificationScheduler).
@@ -84,8 +94,12 @@ struct SettingsView: View {
             Section("Местоположение") {
                 Toggle("Определять автоматически", isOn: $autoLocation)
                 if !autoLocation {
-                    TextField("Широта", value: $manualLat, format: .number)
-                    TextField("Долгота", value: $manualLon, format: .number)
+                    TextField("Широта", text: $latText, prompt: Text("43.3178"))
+                        .focused($coordFocus, equals: .lat)
+                        .onAppear(perform: syncCoordTexts)
+                        .onDisappear(perform: commitCoords)
+                    TextField("Долгота", text: $lonText, prompt: Text("45.6949"))
+                        .focused($coordFocus, equals: .lon)
                     TextField("Город", text: $manualCity, prompt: Text("Для отображения"))
                 }
             }
@@ -125,6 +139,30 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 620)
+        .onSubmit(commitCoords)
+        .onChange(of: coordFocus) { _ in commitCoords() }
+    }
+
+    /// Enter / уход фокуса: валидный ввод — в хранилище, мусор и выход за
+    /// диапазон откатываем к последнему сохранённому значению.
+    private func commitCoords() {
+        if let v = Self.parseCoord(latText, limit: 90)  { manualLat = v }
+        if let v = Self.parseCoord(lonText, limit: 180) { manualLon = v }
+        syncCoordTexts()
+    }
+
+    /// Хранимые координаты → текст полей (0 — «не задано», поле пустое).
+    private func syncCoordTexts() {
+        latText = manualLat == 0 ? "" : "\(manualLat)"
+        lonText = manualLon == 0 ? "" : "\(manualLon)"
+    }
+
+    /// «55.5754» / «55,5754» → Double; пустое, мусор, вне ±limit — nil.
+    static func parseCoord(_ s: String, limit: Double) -> Double? {
+        guard let v = Double(s.trimmingCharacters(in: .whitespaces)
+                                .replacingOccurrences(of: ",", with: ".")),
+              abs(v) <= limit else { return nil }
+        return v
     }
 
     /// Время салавата как Date для DatePicker (храним час/минуту отдельно).

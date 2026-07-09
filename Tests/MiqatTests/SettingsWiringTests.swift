@@ -102,6 +102,18 @@ final class SettingsWiringTests: XCTestCase {
         XCTAssertEqual(PrayerEngine.cityName, "Грозный")
     }
 
+    /// Поле координат: точка и запятая равноправны, без разделителей разрядов;
+    /// пустое, мусор и выход за диапазон отвергаются (останется прежнее значение).
+    func testCoordinateFieldParsing() {
+        XCTAssertEqual(SettingsView.parseCoord("55.5754", limit: 90), 55.5754)
+        XCTAssertEqual(SettingsView.parseCoord("55,5754", limit: 90), 55.5754)
+        XCTAssertEqual(SettingsView.parseCoord(" -45.69 ", limit: 180), -45.69)
+        XCTAssertNil(SettingsView.parseCoord("", limit: 90))
+        XCTAssertNil(SettingsView.parseCoord("abc", limit: 90))
+        XCTAssertNil(SettingsView.parseCoord("55 453 4", limit: 90))  // артефакт старого .number
+        XCTAssertNil(SettingsView.parseCoord("95", limit: 90))        // широта вне ±90
+    }
+
     /// Город не введён — показываем координаты, а не пустую строку.
     func testManualCityFallsBackToCoordinates() {
         defaults.set(false, forKey: "autoLocation")
