@@ -9,6 +9,7 @@ final class NotchState: ObservableObject {
     @Published var notchHeight: CGFloat = 32
     @Published var collapsedSize = CGSize(width: 350, height: 34)
     @Published var expandedSize  = CGSize(width: 430, height: 195)
+    @Published var detached = false        // окно оторвано от чёлки и парит
 
     // Действия развёрнутой карточки — проставляет NotchController (см. init).
     var onOpenSettings: (() -> Void)?
@@ -53,6 +54,15 @@ final class NotchController: NSObject {
     // шторки, зона камеры/чёлки) считалось попаданием, а не «мимо» — NSRect
     // не включает верхнюю границу, а курсор там сидит ровно на maxY.
     private let topOverscan: CGFloat = 8
+
+    // Перетаскивание / магнитное отлипание (прототип).
+    private var dragMonitor: Any?
+    private var potentialDrag = false
+    private var dragging = false
+    private var dragMouseStart = NSPoint.zero
+    private var dragWinStart = NSPoint.zero
+    private let dragThreshold: CGFloat = 6
+    private let snapZone: CGFloat = 110      // магнитная зона у чёлки (px)
 
     init(clock: ClockModel) {
         self.clock = clock
@@ -143,6 +153,11 @@ final class NotchController: NSObject {
                 self.handleClick()
             }
         }
+        // Локальный монитор — перетаскивание развёрнутой карточки (отлипание).
+        dragMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] event in
+            guard let self = self else { return event }
+            return self.handleDrag(event)
+        }
         evaluateHover()
     }
 
@@ -164,6 +179,76 @@ final class NotchController: NSObject {
         if rect.contains(NSEvent.mouseLocation) {
             showContextMenu(at: NSEvent.mouseLocation)
         }
+    }
+
+    // MARK: - Перетаскивание и магнитное отлипание (прототип)
+
+    /// Тянем развёрнутую карточку → окно «отлипает» от чёлки и парит за курсором;
+    /// бросаем у чёлки → примагничивается обратно.
+    private func handleDrag(_ event: NSEvent) -> NSEvent? {
+        switch event.type {
+        case .leftMouseDown:
+            guard event.window === panel, state.expanded, !islandHidden else { return event }
+            potentialDrag = true
+            dragMouseStart = NSEvent.mouseLocation
+            dragWinStart = panel.frame.origin
+            return event                     // не поглощаем — клик (тема/шестерёнка) работает
+        case .leftMouseDragged:
+            guard potentialDrag else { return event }
+            let m = NSEvent.mouseLocation
+            let dx = m.x - dragMouseStart.x, dy = m.y - dragMouseStart.y
+            if !dragging, abs(dx) + abs(dy) > dragThreshold {
+                dragging = true
+                cancelScheduledClose()
+                setDetached(true)
+            }
+            if dragging {
+                panel.setFrameOrigin(NSPoint(x: dragWinStart.x + dx, y: dragWinStart.y + dy))
+                return nil                   // поглощаем — SwiftUI не реагирует во время драга
+            }
+            return event
+        case .leftMouseUp:
+            let wasDragging = dragging
+            potentialDrag = false
+            dragging = false
+            if wasDragging { finishDrag(); return nil }
+            return event
+        default:
+            return event
+        }
+    }
+
+    /// Отпустили: близко к чёлке — примагнитить, иначе оставить парить.
+    private func finishDrag() {
+        guard let screen = NotchController.notchScreen() else { return }
+        let sf = screen.frame
+        let dockedX = sf.minX + (sf.width - expandedSize.width) / 2
+        let dockedY = sf.maxY - expandedSize.height
+        let o = panel.frame.origin
+        if hypot(o.x - dockedX, o.y - dockedY) < snapZone { snapToNotch() }
+    }
+
+    /// Плавно вернуть окно к чёлке и выйти из режима отлипания.
+    private func snapToNotch() {
+        guard let screen = NotchController.notchScreen() else { return }
+        let sf = screen.frame
+        let target = NSRect(x: sf.minX + (sf.width - expandedSize.width) / 2,
+                            y: sf.maxY - expandedSize.height,
+                            width: expandedSize.width, height: expandedSize.height)
+        let p = panel
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.3
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            p.animator().setFrame(target, display: true)
+        }, completionHandler: { [weak self] in
+            self?.setDetached(false)
+        })
+    }
+
+    private func setDetached(_ v: Bool) {
+        guard state.detached != v else { return }
+        state.detached = v
+        panel.hasShadow = v                  // парящая карточка отбрасывает тень
     }
 
     private func openRect(_ sf: NSRect) -> NSRect {
@@ -193,6 +278,8 @@ final class NotchController: NSObject {
             return
         }
 
+        if state.detached { return }   // оторван и парит — наведением не управляем
+
         if state.expanded {
             if openRect(sf).contains(mouse) { cancelScheduledClose() } else { scheduleClose() }
         } else if triggerRect(sf).contains(mouse) {
@@ -206,6 +293,7 @@ final class NotchController: NSObject {
         let item = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
             self.closeWorkItem = nil
+            guard !self.state.detached else { return }   // парит — не сворачиваем в пилюлю
             if let screen = NotchController.notchScreen(),
                !self.openRect(screen.frame).contains(NSEvent.mouseLocation) {
                 self.setExpanded(false)

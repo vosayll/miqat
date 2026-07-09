@@ -20,8 +20,9 @@ struct NotchContainer: View {
     private var fill: Color { state.expanded ? theme.surface : .black }
 
     private var shape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 20,
-                               bottomTrailingRadius: 20, topTrailingRadius: 0)
+        let top: CGFloat = state.detached ? 20 : 0   // парящая карточка скруглена со всех сторон
+        return UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: 20,
+                                      bottomTrailingRadius: 20, topTrailingRadius: top)
     }
 
     var body: some View {
@@ -123,7 +124,7 @@ struct ExpandedCard: View {
             }
         }
         .padding(.horizontal, 18)
-        .padding(.top, state.notchHeight + 8)
+        .padding(.top, state.detached ? 34 : state.notchHeight + 8)   // полоса под шестерёнку и в парящем режиме
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .contentShape(Rectangle())
