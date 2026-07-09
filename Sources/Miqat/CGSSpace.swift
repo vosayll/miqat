@@ -9,8 +9,11 @@
 // Via Boring.Notch (TheBoredTeam/boring.notch), NotchSpaceManager.
 //
 // ⚠️ Использует приватный CoreGraphics/SkyLight API. Годится для прямой
-// раздачи .app; в Mac App Store такое не пропустят.
+// раздачи .app; в Mac App Store такое не пропустят. Поэтому весь файл
+// компилируется ТОЛЬКО в обычной сборке — в App Store-сборке (флаг APPSTORE)
+// он пустой, и приватных символов CGS в бинаре не остаётся.
 
+#if !APPSTORE
 import AppKit
 
 /// Обёртка над приватным Spaces API: создаёт «пространство», в которое можно
@@ -65,3 +68,4 @@ fileprivate func CGSRemoveWindowsFromSpaces(_ cid: CGSConnectionID, _ windows: N
 fileprivate func CGSHideSpaces(_ cid: CGSConnectionID, _ spaces: NSArray)
 @_silgen_name("CGSShowSpaces")
 fileprivate func CGSShowSpaces(_ cid: CGSConnectionID, _ spaces: NSArray)
+#endif

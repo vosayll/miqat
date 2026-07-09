@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import SkyLightWindow
 
 /// Состояние чёлки, общее между окном (AppKit) и интерфейсом (SwiftUI).
 final class NotchState: ObservableObject {
@@ -19,7 +18,9 @@ final class NotchState: ObservableObject {
 }
 
 /// Окно-панель у выреза сверху по центру.
-/// • держится на всех Spaces (CGSSpace) и на локскрине (SkyLight);
+/// • держится на всех рабочих столах (и, в обычной сборке, на локскрине) —
+///   всё платформенное размещение спрятано в `SpacePlacement`, которое само
+///   выбирает приватный или публичный путь в зависимости от сборки;
 /// • пилюля — клики насквозь; развёрнутая карточка ловит клики (шестерёнка→настройки);
 /// • наведение → разворот; КЛИК по островку → смена темы (через мониторы);
 /// • ПРАВЫЙ клик (или Ctrl+клик) → контекстное меню (скрыть/тема/выход);
@@ -32,7 +33,9 @@ final class NotchController: NSObject {
     private let state = NotchState()
     private let themeStore = ThemeStore()
     private let clock: ClockModel
-    private let notchSpace = CGSSpace(level: 2147483647)
+    // Размещение на всех Spaces / локскрине — приватный или публичный путь
+    // выбирается внутри по флагу сборки (см. SpacePlacement).
+    private lazy var placement = SpacePlacement(panel: panel)
 
     private var moveMonitor: Any?
     private var clickMonitor: Any?
@@ -126,7 +129,7 @@ final class NotchController: NSObject {
     func show() {
         positionWindow()
         panel.orderFrontRegardless()
-        notchSpace.windows.insert(panel)
+        placement.showOnAllSpaces()
         startTracking()
         setupLockScreen()
     }
@@ -401,21 +404,16 @@ final class NotchController: NSObject {
         DispatchQueue.main.asyncAfter(wallDeadline: .now() + autoUnhideDelay, execute: item)
     }
 
-    // MARK: - Локскрин (SkyLight)
+    // MARK: - Локскрин
 
+    /// Показ островка на заблокированном экране. Вся платформенная часть — в
+    /// SpacePlacement; в App Store-сборке это no-op (публичного API нет).
     private func setupLockScreen() {
-        let dnc = DistributedNotificationCenter.default()
-        dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+        placement.observeLockScreen(onReveal: { [weak self] in
             guard let self = self else { return }
             self.unhideIsland()          // на локскрине островок виден всегда
             self.state.expanded = false
-            SkyLightOperator.shared.delegateWindow(self.panel)
-            self.panel.orderFrontRegardless()
-        }
-        dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
-            guard let self = self else { return }
-            SkyLightOperator.shared.undelegateWindow(self.panel)
-        }
+        })
     }
 
     // MARK: - Экран/утилиты

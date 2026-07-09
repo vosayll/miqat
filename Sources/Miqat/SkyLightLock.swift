@@ -1,3 +1,8 @@
+// Приватный SkyLight API — ок для прямой раздачи, но не для App Store. Весь файл
+// компилируется ТОЛЬКО в обычной сборке; в App Store-сборке (флаг APPSTORE) он
+// пустой, пакет SkyLightWindow не подключается, и обращений к приватному
+// фреймворку в бинаре нет.
+#if !APPSTORE
 import Cocoa
 import SkyLightWindow
 
@@ -21,3 +26,4 @@ extension SkyLightOperator {
         )
     }
 }
+#endif

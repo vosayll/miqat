@@ -1,5 +1,6 @@
 # Swift / SPM build artifacts
 .build/
+.build-appstore/
 Miqat.app/
 packaging/icon_1024.png
 packaging/AppIcon.iconset/
