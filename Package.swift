@@ -44,6 +44,8 @@ let package = Package(
         .executableTarget(
             name: "Miqat",
             dependencies: targetDependencies,
+            // Встроенный каталог городов (срез GeoNames) — читается через Bundle.module.
+            resources: [.copy("Resources/cities.tsv")],
             swiftSettings: swiftSettings
         ),
         // Тесты разбора ответов API времён намаза (фикстуры — реальные ответы).
