@@ -46,14 +46,21 @@ cp "$BIN" "$APP/Contents/MacOS/$NAME"
 cp "$ROOT/packaging/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/packaging/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
-# Подписываем С App Sandbox entitlements — как потребует App Store. Сэндбокс
-# работает и с ad-hoc подписью, так что локальный запуск честно проверяет,
-# что островок/мониторы/сеть/геолокация не ломаются в песочнице.
+# Ресурсный бандл SPM (каталог городов и пр.) — без него не грузится CityCatalog.
+BUNDLE="$SCRATCH/release/Miqat_Miqat.bundle"
+if [ -d "$BUNDLE" ]; then
+  cp -R "$BUNDLE" "$APP/Contents/Resources/"
+  echo "▶︎ вложен ресурсный бандл: $(basename "$BUNDLE")"
+fi
+
+# Подписываем С App Sandbox entitlements — как потребует App Store. Таймстамп не
+# ставим: он подвешивает codesign, а для передачи другу не нужен (он переподпишет
+# сборку своим Apple Distribution под стор).
 ENT="$ROOT/packaging/Miqat.appstore.entitlements"
 IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep 'Developer ID Application' | head -1 | sed -E 's/.*"(.*)"$/\1/')
 if [ -n "$IDENTITY" ]; then
   echo "▶︎ подпись Developer ID + hardened runtime + App Sandbox…"
-  codesign --force --options runtime --timestamp --entitlements "$ENT" --sign "$IDENTITY" "$APP"
+  codesign --force --options runtime --entitlements "$ENT" --sign "$IDENTITY" "$APP"
 else
   echo "▶︎ ad-hoc подпись + App Sandbox…"
   codesign --force --entitlements "$ENT" --sign - "$APP"
