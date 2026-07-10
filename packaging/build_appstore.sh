@@ -33,3 +33,31 @@ if [ -n "$BAD_SYM$BAD_STR" ]; then
 fi
 echo "✓ приватных символов CGS/SkyLight в бинаре нет"
 echo "✓ App Store-бинарь готов: $BIN"
+
+# Заворачиваем в запускаемый MiqatAppStore.app (отдельно от обычного Miqat.app,
+# чтобы можно было гонять оба варианта и сравнивать). Подпись — Developer ID,
+# если есть (как в обычной сборке), иначе ad-hoc: локально запустить хватит.
+# Настоящая выкладка в App Store подписывается отдельно (App Sandbox + провижининг).
+APP="$ROOT/MiqatAppStore.app"
+echo "▶︎ собираю MiqatAppStore.app…"
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp "$BIN" "$APP/Contents/MacOS/$NAME"
+cp "$ROOT/packaging/Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/packaging/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+
+# Подписываем С App Sandbox entitlements — как потребует App Store. Сэндбокс
+# работает и с ad-hoc подписью, так что локальный запуск честно проверяет,
+# что островок/мониторы/сеть/геолокация не ломаются в песочнице.
+ENT="$ROOT/packaging/Miqat.appstore.entitlements"
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep 'Developer ID Application' | head -1 | sed -E 's/.*"(.*)"$/\1/')
+if [ -n "$IDENTITY" ]; then
+  echo "▶︎ подпись Developer ID + hardened runtime + App Sandbox…"
+  codesign --force --options runtime --timestamp --entitlements "$ENT" --sign "$IDENTITY" "$APP"
+else
+  echo "▶︎ ad-hoc подпись + App Sandbox…"
+  codesign --force --entitlements "$ENT" --sign - "$APP"
+fi
+echo "✓ App Store-приложение готово (в песочнице): $APP"
+echo "▶︎ проверка entitlements:"
+codesign -d --entitlements - "$APP" 2>/dev/null | grep -iE "sandbox|network|location" || true

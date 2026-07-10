@@ -2,6 +2,7 @@
 .build/
 .build-appstore/
 Miqat.app/
+MiqatAppStore.app/
 packaging/icon_1024.png
 packaging/AppIcon.iconset/
 packaging/signing/
