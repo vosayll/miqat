@@ -19,6 +19,7 @@ final class SettingsWiringTests: XCTestCase {
         PrayerEngine.gpsAdminArea = nil
         PrayerEngine.manualCountryCode = nil
         PrayerEngine.manualAdminArea = nil
+        PrayerEngine.manualGeocodedCity = nil
         super.tearDown()
     }
 

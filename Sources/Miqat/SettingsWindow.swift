@@ -6,10 +6,13 @@ import SwiftUI
 /// NotchController, повторное открытие поднимает существующее. Крестик
 /// просто прячет окно — приложение продолжает жить в чёлке.
 final class SettingsWindowController: NSWindowController {
-    convenience init(themeStore: ThemeStore) {
-        let hosting = NSHostingController(rootView: SettingsView().environmentObject(themeStore))
+    convenience init(themeStore: ThemeStore, languageStore: LanguageStore) {
+        let root = SettingsView()
+            .environmentObject(themeStore)
+            .environmentObject(languageStore)
+        let hosting = NSHostingController(rootView: root)
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Настройки Miqat"
+        window.title = languageStore.t("Настройки Miqat", "Miqat Settings")
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false   // иначе повторное открытие — крэш
         self.init(window: window)

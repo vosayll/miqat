@@ -33,14 +33,23 @@ enum Format {
         return h > 0 ? "\(h)h \(m)m remaining" : "\(m)m remaining"
     }
 
-    static func hijri(_ date: Date) -> String {
-        let cal = Calendar(identifier: .islamicUmmAlQura)
+    /// Дата по Хиджре на языке интерфейса (ru/en): в русском — «10 Мухаррам 1448».
+    /// Русская локаль даёт строчный месяц — поднимаем первую букву (только её,
+    /// чтобы «раби аль-авваль» не стало «Раби Аль-Авваль»). День/год форматируем
+    /// отдельно, чтобы регистр не задел цифры.
+    static func hijri(_ date: Date, ru: Bool) -> String {
         let f = DateFormatter()
-        f.calendar = cal
-        f.locale = Locale(identifier: "en")
+        f.calendar = Calendar(identifier: .islamicUmmAlQura)
+        f.locale = Locale(identifier: ru ? "ru" : "en")
         f.timeZone = .current
-        f.dateFormat = "d MMMM yyyy"
-        return f.string(from: date)
+
+        f.dateFormat = "MMMM"
+        let raw = f.string(from: date)
+        let month = raw.prefix(1).uppercased() + raw.dropFirst()
+
+        f.dateFormat = "d"; let day = f.string(from: date)
+        f.dateFormat = "yyyy"; let year = f.string(from: date)
+        return "\(day) \(month) \(year)"
     }
 }
 

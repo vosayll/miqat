@@ -46,12 +46,13 @@ struct CollapsedPill: View {
     @EnvironmentObject var clock: ClockModel
     @EnvironmentObject var state: NotchState
     @EnvironmentObject var themeStore: ThemeStore
+    @EnvironmentObject var language: LanguageStore
 
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
                 Image(systemName: "moon.fill").font(.system(size: 11)).foregroundStyle(themeStore.theme.accent)
-                Text((clock.next?.name ?? "—").uppercased())
+                Text(language.prayer(clock.next?.name ?? "—").uppercased())
                     .font(.system(size: 11, weight: .semibold)).tracking(1.0)
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1).fixedSize()
@@ -81,6 +82,7 @@ struct ExpandedCard: View {
     @EnvironmentObject var clock: ClockModel
     @EnvironmentObject var state: NotchState
     @EnvironmentObject var themeStore: ThemeStore
+    @EnvironmentObject var language: LanguageStore
 
     private var theme: Theme { themeStore.theme }
 
@@ -89,7 +91,7 @@ struct ExpandedCard: View {
             // Шапка: слева имя + крупный таймер, справа город + Хиджра + луна
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text((clock.next?.name ?? "—").uppercased())
+                    Text(language.prayer(clock.next?.name ?? "—").uppercased())
                         .font(.system(size: 12, weight: .semibold)).tracking(0.5)
                         .foregroundStyle(theme.sub).lineLimit(1)
                     Text(Format.hms(clock.timeLeft))
@@ -104,7 +106,7 @@ struct ExpandedCard: View {
                         Text(PrayerEngine.cityName)
                             .font(.system(size: 15, weight: .bold)).foregroundStyle(theme.ink)
                             .lineLimit(1).minimumScaleFactor(0.7)
-                        Text(Format.hijri(clock.now))
+                        Text(Format.hijri(clock.now, ru: language.isRU))
                             .font(.system(size: 11, weight: .medium)).foregroundStyle(theme.sub)
                             .lineLimit(1).minimumScaleFactor(0.7)
                     }
@@ -150,10 +152,11 @@ struct ChipView: View {
     let chip: PrayerChip
     let active: Bool
     let theme: Theme
+    @EnvironmentObject var language: LanguageStore
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(chip.name.uppercased())
+            Text(language.prayer(chip.name).uppercased())
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(active ? theme.activeText : theme.sub)
                 .lineLimit(1)

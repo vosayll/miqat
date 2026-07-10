@@ -32,6 +32,7 @@ final class NotchController: NSObject {
     private let panel: NSPanel
     private let state = NotchState()
     private let themeStore = ThemeStore()
+    private let languageStore = LanguageStore()
     private let clock: ClockModel
     // Размещение на всех Spaces / локскрине — приватный или публичный путь
     // выбирается внутри по флагу сборки (см. SpacePlacement).
@@ -121,6 +122,7 @@ final class NotchController: NSObject {
             .environmentObject(clock)
             .environmentObject(state)
             .environmentObject(themeStore)
+            .environmentObject(languageStore)
         let hosting = NSHostingView(rootView: root)
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting
@@ -363,7 +365,8 @@ final class NotchController: NSObject {
     /// Открыть (или поднять уже открытое) окно настроек.
     @objc private func openSettings() {
         if settingsController == nil {
-            settingsController = SettingsWindowController(themeStore: themeStore)
+            settingsController = SettingsWindowController(themeStore: themeStore,
+                                                         languageStore: languageStore)
         }
         settingsController?.show()
     }

@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let aa = self.location.administrativeArea  { PrayerEngine.gpsAdminArea = aa }
             self.clock.refresh()
         }
+        location.localeID = Self.appLocaleID          // город — на языке интерфейса
         location.start()
 
         // Ручная локация: геокодим её координаты, чтобы «Авто (по региону)»
@@ -51,7 +52,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.settingsDebounce?.cancel()
             let work = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
-                self.geocodeManualLocationIfNeeded()   // ручные координаты могли смениться
+                // Язык мог смениться → город переспросить на новом языке.
+                let loc = Self.appLocaleID
+                if self.location.localeID != loc {
+                    self.location.localeID = loc            // авто: переспрос GPS-города
+                    self.lastManualGeocode = nil            // ручная: форсируем переспрос
+                    PrayerEngine.manualGeocodedCity = nil
+                }
+                self.geocodeManualLocationIfNeeded()   // ручные координаты/язык могли смениться
                 self.clock.refresh()
             }
             self.settingsDebounce = work
@@ -81,12 +89,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard abs(lat) <= 90, abs(lon) <= 180, lat != 0 || lon != 0 else { return }
         if let last = lastManualGeocode, last.lat == lat, last.lon == lon { return }
         lastManualGeocode = (lat, lon)
+        PrayerEngine.manualGeocodedCity = nil    // до ответа не показываем старое имя
 
-        location.geocode(latitude: lat, longitude: lon) { [weak self] country, area, _ in
+        location.geocode(latitude: lat, longitude: lon) { [weak self] country, area, city in
             PrayerEngine.manualCountryCode = country
             PrayerEngine.manualAdminArea = area
+            PrayerEngine.manualGeocodedCity = city   // имя города на языке интерфейса
             self?.clock.refresh()
         }
+    }
+
+    /// Локаль языка интерфейса для геокодера (ключ LanguageStore).
+    private static var appLocaleID: String {
+        (UserDefaults.standard.string(forKey: "miqat.language") ?? "ru") == "en" ? "en" : "ru"
     }
 }
 

@@ -6,6 +6,7 @@ import SwiftUI
 /// в соседней ветке); тема — существующий ThemeStore, отдельно не храним.
 struct SettingsView: View {
     @EnvironmentObject var themeStore: ThemeStore
+    @EnvironmentObject var language: LanguageStore
 
     // Источник времён: auto | api | local (читает движок расчёта).
     @AppStorage("prayerSource") private var prayerSource = "auto"
@@ -48,68 +49,77 @@ struct SettingsView: View {
     // Поправки времён — словарь, @AppStorage его не умеет: своя обёртка.
     @StateObject private var offsets = PrayerOffsets()
 
-    /// Методы расчёта: код Aladhan (/v1/methods) → название.
-    private struct Method: Identifiable { let id: Int; let name: String }
+    /// Методы расчёта: код Aladhan (/v1/methods) → название (рус/англ).
+    private struct Method: Identifiable { let id: Int; let ru: String; let en: String }
     private static let methods: [Method] = [
-        .init(id: 14, name: "ДУМ России"),
-        .init(id: 3,  name: "MWL — Всемирная исламская лига"),
-        .init(id: 4,  name: "Умм аль-Кура — Мекка"),
-        .init(id: 5,  name: "Египетское управление"),
-        .init(id: 13, name: "Турция (Diyanet)"),
-        .init(id: 2,  name: "ISNA — Северная Америка"),
-        .init(id: 1,  name: "Университет Карачи"),
-        .init(id: 7,  name: "Тегеран"),
-        .init(id: 16, name: "Дубай"),
-        .init(id: 8,  name: "Персидский залив"),
-        .init(id: 9,  name: "Кувейт"),
-        .init(id: 10, name: "Катар"),
-        .init(id: 11, name: "Сингапур"),
-        .init(id: 15, name: "Moonsighting Committee"),
+        .init(id: 14, ru: "ДУМ России",                    en: "Muftiate of Russia"),
+        .init(id: 3,  ru: "MWL — Всемирная исламская лига", en: "MWL — Muslim World League"),
+        .init(id: 4,  ru: "Умм аль-Кура — Мекка",          en: "Umm al-Qura — Makkah"),
+        .init(id: 5,  ru: "Египетское управление",          en: "Egyptian Authority"),
+        .init(id: 13, ru: "Турция (Diyanet)",               en: "Turkey (Diyanet)"),
+        .init(id: 2,  ru: "ISNA — Северная Америка",        en: "ISNA — North America"),
+        .init(id: 1,  ru: "Университет Карачи",             en: "University of Karachi"),
+        .init(id: 7,  ru: "Тегеран",                        en: "Tehran"),
+        .init(id: 16, ru: "Дубай",                          en: "Dubai"),
+        .init(id: 8,  ru: "Персидский залив",               en: "Gulf Region"),
+        .init(id: 9,  ru: "Кувейт",                         en: "Kuwait"),
+        .init(id: 10, ru: "Катар",                          en: "Qatar"),
+        .init(id: 11, ru: "Сингапур",                       en: "Singapore"),
+        .init(id: 15, ru: "Moonsighting Committee",         en: "Moonsighting Committee"),
     ]
 
     var body: some View {
         Form {
-            Section("Источник времён") {
-                Picker("Источник", selection: $prayerSource) {
-                    Text("Авто").tag("auto")
+            Section(language.t("Язык", "Language")) {
+                Picker(language.t("Язык интерфейса", "Interface language"), selection: $language.lang) {
+                    Text("Русский").tag(AppLang.ru)
+                    Text("English").tag(AppLang.en)
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section(language.t("Источник времён", "Time source")) {
+                Picker(language.t("Источник", "Source"), selection: $prayerSource) {
+                    Text(language.t("Авто", "Auto")).tag("auto")
                     Text("API").tag("api")
-                    Text("Локальный расчёт").tag("local")
+                    Text(language.t("Локальный расчёт", "On-device")).tag("local")
                 }
             }
 
-            Section("Метод расчёта") {
-                Toggle("Авто (по региону)", isOn: $methodAuto)
-                Picker("Метод", selection: $calcMethod) {
-                    ForEach(Self.methods) { Text($0.name).tag($0.id) }
+            Section(language.t("Метод расчёта", "Calculation method")) {
+                Toggle(language.t("Авто (по региону)", "Auto (by region)"), isOn: $methodAuto)
+                Picker(language.t("Метод", "Method"), selection: $calcMethod) {
+                    ForEach(Self.methods) { Text(language.isRU ? $0.ru : $0.en).tag($0.id) }
                 }
                 .disabled(methodAuto)
-                Picker("Мазхаб (Аср)", selection: $asrSchool) {
-                    Text("Шафиитский").tag(0)
-                    Text("Ханафитский").tag(1)
+                Picker(language.t("Мазхаб (Аср)", "Madhab (Asr)"), selection: $asrSchool) {
+                    Text(language.t("Шафиитский", "Shafi")).tag(0)
+                    Text(language.t("Ханафитский", "Hanafi")).tag(1)
                 }
                 .disabled(methodAuto)
             }
 
-            Section("Местоположение") {
-                Toggle("Определять автоматически", isOn: $autoLocation)
+            Section(language.t("Местоположение", "Location")) {
+                Toggle(language.t("Определять автоматически", "Detect automatically"), isOn: $autoLocation)
                 if !autoLocation {
                     if !manualCity.isEmpty {
                         HStack(spacing: 8) {
-                            Text("Сейчас: \(manualCity)").fontWeight(.medium)
+                            Text("\(language.t("Сейчас", "Current")): \(manualCity)").fontWeight(.medium)
                             Spacer()
                             Button(action: clearCity) {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundStyle(.secondary)
                             }
                             .buttonStyle(.plain)
-                            .help("Сбросить город")
+                            .help(language.t("Сбросить город", "Clear city"))
                         }
                     }
-                    TextField("Поиск города", text: $citySearch,
-                              prompt: Text("Начните вводить: Грозный, Москва…"))
+                    TextField(language.t("Поиск города", "Search city"), text: $citySearch,
+                              prompt: Text(language.t("Начните вводить: Грозный, Москва…",
+                                                      "Start typing: Grozny, Moscow…")))
                     if citySearch.count >= 2 {
                         if cityResults.isEmpty {
-                            Text("Ничего не найдено")
+                            Text(language.t("Ничего не найдено", "Nothing found"))
                                 .font(.callout).foregroundStyle(.secondary)
                         } else {
                             ForEach(cityResults) { city in
@@ -119,7 +129,7 @@ struct SettingsView: View {
                                             .foregroundStyle(.secondary)
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(city.displayName)
-                                            Text(Self.subtitle(city))
+                                            Text(subtitle(city))
                                                 .font(.caption).foregroundStyle(.secondary)
                                         }
                                         Spacer()
@@ -133,42 +143,43 @@ struct SettingsView: View {
                             }
                         }
                     } else {
-                        Text("Выберите город из списка — по нему считаются времена намаза")
+                        Text(language.t("Выберите город из списка — по нему считаются времена намаза",
+                                        "Pick a city from the list — prayer times use it"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
 
-            Section("Поправки времён (минуты)") {
+            Section(language.t("Поправки времён (минуты)", "Time offsets (minutes)")) {
                 ForEach(PrayerOffsets.prayers) { p in
                     Stepper(value: offsets.binding(p.id), in: -59...59) {
-                        LabeledContent(p.title, value: Self.signed(offsets.values[p.id] ?? 0))
+                        LabeledContent(language.prayer(p.id), value: Self.signed(offsets.values[p.id] ?? 0))
                     }
                 }
-                Button("Сбросить поправки") { offsets.reset() }
+                Button(language.t("Сбросить поправки", "Reset offsets")) { offsets.reset() }
             }
 
-            Section("Уведомления") {
-                Toggle("Напоминать о намазе", isOn: $notifyEnabled)
+            Section(language.t("Уведомления", "Notifications")) {
+                Toggle(language.t("Напоминать о намазе", "Prayer reminders"), isOn: $notifyEnabled)
                 Stepper(value: $notifyLeadMinutes, in: 0...60) {
-                    LabeledContent("Заранее, минут",
-                                   value: notifyLeadMinutes == 0 ? "во время намаза"
-                                                                 : "\(notifyLeadMinutes) мин")
+                    LabeledContent(language.t("Заранее, минут", "Lead, minutes"),
+                                   value: notifyLeadMinutes == 0 ? language.t("во время намаза", "at prayer time")
+                                                                 : "\(notifyLeadMinutes) \(language.t("мин", "min"))")
                 }
                 .disabled(!notifyEnabled)
             }
 
-            Section("Салават") {
-                Toggle("Ежедневный салават Пророку ﷺ", isOn: $salawatEnabled)
-                Toggle("Пятница: сура «Аль-Кахф»", isOn: $salawatKahf)
-                DatePicker("Время", selection: salawatTimeBinding, displayedComponents: .hourAndMinute)
+            Section(language.t("Салават", "Salawat")) {
+                Toggle(language.t("Ежедневный салават Пророку ﷺ", "Daily salawat ﷺ"), isOn: $salawatEnabled)
+                Toggle(language.t("Пятница: сура «Аль-Кахф»", "Friday: Surah Al-Kahf"), isOn: $salawatKahf)
+                DatePicker(language.t("Время", "Time"), selection: salawatTimeBinding, displayedComponents: .hourAndMinute)
                     .disabled(!salawatEnabled && !salawatKahf)
             }
 
-            Section("Оформление") {
-                Picker("Тема", selection: $themeStore.isDark) {
-                    Text("Зелёная").tag(false)
-                    Text("Тёмная").tag(true)
+            Section(language.t("Оформление", "Appearance")) {
+                Picker(language.t("Тема", "Theme"), selection: $themeStore.isDark) {
+                    Text(language.t("Зелёная", "Green")).tag(false)
+                    Text(language.t("Тёмная", "Dark")).tag(true)
                 }
             }
         }
@@ -196,15 +207,16 @@ struct SettingsView: View {
     }
 
     /// Подпись под названием: страна и население (для различения тёзок).
-    private static func subtitle(_ c: City) -> String {
+    /// Подпись под названием: страна и население (для различения тёзок).
+    private func subtitle(_ c: City) -> String {
         var parts = [c.country]
         if c.population > 0 { parts.append(population(c.population)) }
         return parts.joined(separator: " · ")
     }
 
-    private static func population(_ n: Int) -> String {
-        n >= 1_000_000 ? String(format: "%.1f млн", Double(n) / 1_000_000)
-                       : n >= 1_000 ? "\(n / 1_000) тыс." : "\(n)"
+    private func population(_ n: Int) -> String {
+        n >= 1_000_000 ? String(format: "%.1f \(language.t("млн", "M"))", Double(n) / 1_000_000)
+                       : n >= 1_000 ? "\(n / 1_000) \(language.t("тыс.", "K"))" : "\(n)"
     }
 
     /// Время салавата как Date для DatePicker (храним час/минуту отдельно).

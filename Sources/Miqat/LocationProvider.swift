@@ -18,8 +18,18 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Вызывается, когда есть свежие координаты или название города.
     var onUpdate: (() -> Void)?
 
+    /// Локаль для названий городов (язык интерфейса): при смене — переспрашиваем
+    /// геокодер, чтобы город сменил язык («Грозный» ↔ «Grozny»).
+    var localeID: String = "ru" {
+        didSet {
+            guard localeID != oldValue, let loc = lastLocation else { return }
+            reverseGeocode(loc)
+        }
+    }
+
     private let manager = CLLocationManager()
     private let geocoder = CLGeocoder()
+    private var lastLocation: CLLocation?
 
     override init() {
         super.init()
@@ -52,6 +62,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let loc = locations.last else { return }
         coordinate = loc.coordinate
+        lastLocation = loc
         manager.stopUpdatingLocation()   // одного фикса достаточно
         onUpdate?()
         reverseGeocode(loc)
@@ -62,7 +73,8 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func reverseGeocode(_ loc: CLLocation) {
-        geocoder.reverseGeocodeLocation(loc) { [weak self] placemarks, _ in
+        geocoder.cancelGeocode()   // отменяем прежний (напр. при быстрой смене языка)
+        geocoder.reverseGeocodeLocation(loc, preferredLocale: Locale(identifier: localeID)) { [weak self] placemarks, _ in
             guard let self = self else { return }
             let placemark = placemarks?.first
             self.cityName = placemark?.locality
@@ -78,7 +90,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     func geocode(latitude: Double, longitude: Double,
                  completion: @escaping (_ country: String?, _ area: String?, _ city: String?) -> Void) {
         let loc = CLLocation(latitude: latitude, longitude: longitude)
-        CLGeocoder().reverseGeocodeLocation(loc) { placemarks, _ in
+        CLGeocoder().reverseGeocodeLocation(loc, preferredLocale: Locale(identifier: localeID)) { placemarks, _ in
             let p = placemarks?.first
             completion(p?.isoCountryCode, p?.administrativeArea, p?.locality)
         }

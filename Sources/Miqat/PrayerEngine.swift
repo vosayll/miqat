@@ -36,6 +36,14 @@ enum PrayerEngine {
     static var gpsAdminArea: String?
     static var manualCountryCode: String?
     static var manualAdminArea: String?
+    /// Локализованное имя города из геокода ручных координат (в языке интерфейса).
+    static var manualGeocodedCity: String?
+
+    /// Язык интерфейса русский? (читаем ключ LanguageStore напрямую — движок
+    /// не SwiftUI и не держит ссылку на хранилище.)
+    private static var isRU: Bool {
+        (UserDefaults.standard.string(forKey: "miqat.language") ?? "ru") != "en"
+    }
 
     /// Эффективные страна/регион под текущую локацию (ручная перебивает GPS).
     static var countryCode: String? { manualCoordinate != nil ? manualCountryCode : gpsCountryCode }
@@ -47,10 +55,15 @@ enum PrayerEngine {
         manualCoordinate ?? gpsCoordinate ?? grozny
     }
 
-    /// Отображаемый город: при ручной локации — "manualCity" (или координаты,
-    /// если город не введён), иначе GPS-город; фоллбэк — Грозный.
+    /// Отображаемый город в языке интерфейса. Ручная локация: сперва
+    /// геокодированное имя (оно уже на нужном языке), иначе введённое имя из
+    /// каталога, иначе координаты. Авто: GPS-город (геокодер в языке интерфейса).
+    /// Фоллбэк — Грозный на текущем языке.
     static var cityName: String {
-        guard let manual = manualCoordinate else { return gpsCityName ?? "Грозный" }
+        guard let manual = manualCoordinate else {
+            return gpsCityName ?? (isRU ? "Грозный" : "Grozny")
+        }
+        if let g = manualGeocodedCity, !g.isEmpty { return g }
         let city = (UserDefaults.standard.string(forKey: "manualCity") ?? "")
             .trimmingCharacters(in: .whitespaces)
         return city.isEmpty ? String(format: "%.2f, %.2f", manual.latitude, manual.longitude) : city
