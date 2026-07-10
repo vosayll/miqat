@@ -40,6 +40,21 @@ final class CityCatalogTests: XCTestCase {
         XCTAssertEqual(first.id, 524901, "самая крупная Москва должна быть первой")
     }
 
+    /// Ввод по-русски находит город через транслитерацию (без словаря рус. имён):
+    /// «Грозный» → groznyy ≈ Grozny. Актуально для Кавказа/РФ (латиница = транслит).
+    func testSearchCyrillicViaTranslit() {
+        XCTAssertNotNil(catalog.search("грозный").first { $0.id == 558418 },
+                        "«Грозный» должен найти Grozny")
+        XCTAssertNotNil(catalog.search("гроз").first { $0.id == 558418 },
+                        "частичный «гроз» тоже находит Grozny")
+    }
+
+    /// Транслитерация: хвост «ый» → «yy», совпадение по префиксу с «grozny».
+    func testTranslit() {
+        XCTAssertEqual(CityCatalog.translit("грозный"), "groznyy")
+        XCTAssertEqual(CityCatalog.translit("назрань"), "nazran")
+    }
+
     /// Слишком короткий запрос не сканирует весь мир.
     func testShortQueryEmpty() {
         XCTAssertTrue(catalog.search("g").isEmpty)

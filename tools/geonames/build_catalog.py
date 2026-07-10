@@ -15,7 +15,9 @@
 import sys
 
 def load_ru(path: str) -> dict:
-    """geonameId -> русское имя (из extract_ru.py, языковые метки GeoNames)."""
+    """geonameId -> русское имя (из extract_ru.py, языковые метки GeoNames).
+    Файл — из отдельной языковой выгрузки; когда его нет, русское имя пустое,
+    а поиск кириллицей обеспечивается транслитерацией запроса в приложении."""
     ru = {}
     try:
         with open(path, encoding='utf-8') as f:

@@ -94,26 +94,47 @@ struct SettingsView: View {
                 Toggle("Определять автоматически", isOn: $autoLocation)
                 if !autoLocation {
                     if !manualCity.isEmpty {
-                        LabeledContent("Выбран город", value: manualCity)
+                        HStack(spacing: 8) {
+                            Text("Сейчас: \(manualCity)").fontWeight(.medium)
+                            Spacer()
+                            Button(action: clearCity) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Сбросить город")
+                        }
                     }
                     TextField("Поиск города", text: $citySearch,
-                              prompt: Text("Например: Грозный или Grozny"))
-                    ForEach(cityResults) { city in
-                        Button { select(city) } label: {
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(city.displayName)
-                                    Text(Self.subtitle(city))
-                                        .font(.caption).foregroundStyle(.secondary)
+                              prompt: Text("Начните вводить: Грозный, Москва…"))
+                    if citySearch.count >= 2 {
+                        if cityResults.isEmpty {
+                            Text("Ничего не найдено")
+                                .font(.callout).foregroundStyle(.secondary)
+                        } else {
+                            ForEach(cityResults) { city in
+                                Button { select(city) } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "mappin.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(city.displayName)
+                                            Text(Self.subtitle(city))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: city.id == manualGeonameId
+                                              ? "checkmark.circle.fill" : "plus.circle.fill")
+                                            .foregroundStyle(.tint)
+                                    }
+                                    .contentShape(Rectangle())
                                 }
-                                Spacer()
-                                if city.id == manualGeonameId {
-                                    Image(systemName: "checkmark").foregroundStyle(.tint)
-                                }
+                                .buttonStyle(.plain)
                             }
-                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                    } else {
+                        Text("Выберите город из списка — по нему считаются времена намаза")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -161,6 +182,16 @@ struct SettingsView: View {
         manualLon = c.longitude
         manualCity = c.displayName
         manualGeonameId = c.id
+        citySearch = ""
+    }
+
+    /// Сброс выбранного города — крестик у строки «Сейчас: …».
+    /// Локация уходит на фоллбэк (Грозный), пока не выберут заново.
+    private func clearCity() {
+        manualCity = ""
+        manualLat = 0
+        manualLon = 0
+        manualGeonameId = 0
         citySearch = ""
     }
 

@@ -73,16 +73,25 @@ final class CityCatalog {
         return bestIdx >= 0 ? cities[bestIdx] : nil
     }
 
-    /// Поиск по названию (рус/англ). Совпадение с начала слова важнее, затем —
-    /// население. Меньше 2 символов запроса — пусто (не сканируем весь мир зря).
+    /// Поиск по названию. Латиница ищется как есть; кириллица дополнительно
+    /// транслитерируется в латиницу и сверяется с англ. написанием — так ввод
+    /// «Грозный» находит Grozny без словаря русских имён. Меньше 2 символов —
+    /// пусто (не сканируем весь мир зря).
     func search(_ query: String, limit: Int = 20) -> [City] {
         ensureLoaded()
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard q.count >= 2 else { return [] }
+        // Транслит запроса — только если в нём есть кириллица.
+        let tr = q.unicodeScalars.contains { $0.value >= 0x0400 && $0.value <= 0x04FF }
+            ? Self.translit(q) : nil
 
         var hits: [(city: City, rank: Int)] = []
-        for (i, key) in keys.enumerated() where key.contains(q) {
-            hits.append((cities[i], rank(cities[i], q)))
+        for (i, key) in keys.enumerated() {
+            if key.contains(q) {
+                hits.append((cities[i], rank(cities[i], q)))
+            } else if let tr = tr, Self.matchesTranslit(cities[i].asciiName.lowercased(), tr) {
+                hits.append((cities[i], 1))
+            }
         }
         return Array(hits.sorted {
             $0.rank != $1.rank ? $0.rank > $1.rank : $0.city.population > $1.city.population
@@ -94,5 +103,22 @@ final class CityCatalog {
         if c.ru.lowercased().hasPrefix(q) || c.name.lowercased().hasPrefix(q) { return 2 }
         if c.asciiName.lowercased().hasPrefix(q) { return 1 }
         return 0
+    }
+
+    /// Транслит запроса ≈ англ. написание: одно начинается с другого. Хвосты
+    /// вроде «ый»→«yy» против «y» так не мешают (grozny/groznyy — совпадение).
+    private static func matchesTranslit(_ ascii: String, _ tr: String) -> Bool {
+        ascii.hasPrefix(tr) || tr.hasPrefix(ascii) || ascii.contains(tr)
+    }
+
+    /// Простая русско-латинская транслитерация запроса (ГОСТ-подобная).
+    private static let translitMap: [Character: String] = [
+        "а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ё":"e","ж":"zh","з":"z",
+        "и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r",
+        "с":"s","т":"t","у":"u","ф":"f","х":"kh","ц":"ts","ч":"ch","ш":"sh",
+        "щ":"sch","ъ":"","ы":"y","ь":"","э":"e","ю":"yu","я":"ya",
+    ]
+    static func translit(_ s: String) -> String {
+        s.lowercased().reduce(into: "") { $0 += translitMap[$1] ?? String($1) }
     }
 }
