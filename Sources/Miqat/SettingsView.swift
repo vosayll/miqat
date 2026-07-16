@@ -177,14 +177,27 @@ struct SettingsView: View {
             }
 
             Section(language.t("Оформление", "Appearance")) {
-                Picker(language.t("Тема", "Theme"), selection: $themeStore.isDark) {
-                    Text(language.t("Зелёная", "Green")).tag(false)
-                    Text(language.t("Тёмная", "Dark")).tag(true)
+                Picker(language.t("Стиль", "Style"), selection: $themeStore.style) {
+                    ForEach(AppStyle.allCases) { s in
+                        Text(s.title(ru: language.isRU)).tag(s)
+                    }
+                }
+                // Светлая/тёмная — только у базового стиля; у остальных фиксировано.
+                if themeStore.canToggleTheme {
+                    Picker(language.t("Тема", "Theme"), selection: $themeStore.isDark) {
+                        Text(language.t("Зелёная", "Green")).tag(false)
+                        Text(language.t("Тёмная", "Dark")).tag(true)
+                    }
                 }
             }
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 620)
+        // Блок настроек подхватывает раскраску выбранного стиля.
+        .tint(themeStore.theme.accent)
+        .preferredColorScheme(themeStore.isDarkMood ? .dark : .light)
+        .scrollContentBackground(.hidden)
+        .background(themeStore.theme.surface)
     }
 
     /// Выбор города из каталога → в ручную локацию (её читает PrayerEngine).

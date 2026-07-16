@@ -16,8 +16,9 @@ struct NotchContainer: View {
     private var size: CGSize { state.expanded ? state.expandedSize : state.collapsedSize }
     private var theme: Theme { themeStore.theme }
 
-    // Свёрнутая — всегда чёрная (сливается с чёлкой); развёрнутая — цвет темы.
-    private var fill: Color { state.expanded ? theme.surface : .black }
+    // Свёрнутая — всегда чёрная (сливается с чёлкой); развёрнутая — заливка стиля
+    // (градиент или сплошной цвет).
+    private var fill: AnyShapeStyle { state.expanded ? theme.cardStyle : AnyShapeStyle(.black) }
 
     private var shape: UnevenRoundedRectangle {
         let top: CGFloat = state.detached ? 20 : 0   // парящая карточка скруглена со всех сторон
@@ -28,6 +29,10 @@ struct NotchContainer: View {
     var body: some View {
         ZStack(alignment: .top) {
             shape.fill(fill)
+            if state.expanded, let wm = theme.watermark {
+                Watermark(spec: wm, tint: theme.accent)
+                    .clipShape(shape).allowsHitTesting(false)
+            }
             Group {
                 if state.expanded { ExpandedCard() } else { CollapsedPill() }
             }
@@ -37,6 +42,7 @@ struct NotchContainer: View {
         .overlay(shape.stroke(Color.white.opacity(0.06), lineWidth: 1))
         .animation(.spring(response: 0.42, dampingFraction: 0.85), value: state.expanded)
         .animation(.easeInOut(duration: 0.4), value: themeStore.isDark)
+        .animation(.easeInOut(duration: 0.4), value: themeStore.style)
     }
 }
 
@@ -51,7 +57,7 @@ struct CollapsedPill: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
-                Image(systemName: "moon.fill").font(.system(size: 11)).foregroundStyle(themeStore.theme.accent)
+                Image(systemName: "moon.fill").font(.system(size: 11)).foregroundStyle(themeStore.pillAccent)
                 Text(language.prayer(clock.next?.name ?? "—").uppercased())
                     .font(.system(size: 11, weight: .semibold)).tracking(1.0)
                     .foregroundStyle(.white.opacity(0.6))
@@ -66,7 +72,7 @@ struct CollapsedPill: View {
                     .font(.system(size: 14, weight: .semibold)).monospacedDigit()
                     .foregroundStyle(.white)
                     .lineLimit(1).fixedSize()
-                ProgressRing(progress: clock.progress, color: themeStore.theme.accent)
+                ProgressRing(progress: clock.progress, color: themeStore.pillAccent)
                     .frame(width: 14, height: 14)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -134,8 +140,10 @@ struct ExpandedCard: View {
         .onHover { state.onCardHover?($0) }
         .contextMenu {
             Button("Скрыть островок") { state.onHide?() }
-            Divider()
-            Button(themeStore.isDark ? "Тема: Зелёная" : "Тема: Тёмная") { themeStore.toggle() }
+            if themeStore.canToggleTheme {
+                Divider()
+                Button(themeStore.isDark ? "Тема: Зелёная" : "Тема: Тёмная") { themeStore.toggle() }
+            }
             Divider()
             Button("Настройки…") { state.onOpenSettings?() }
             Button("Выйти из Miqat") { state.onQuit?() }
@@ -171,6 +179,78 @@ struct ChipView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8).padding(.horizontal, 2)
         .background(RoundedRectangle(cornerRadius: 11).fill(active ? theme.accent : theme.chipBg))
+    }
+}
+
+// MARK: - Фоновый водяной знак карточки (girih / полумесяц)
+
+/// Фоновый узор карточки — размещается точно по данным из макета (WatermarkSpec):
+/// размер, центр (доля карточки), поворот, прозрачность. Эталонная карточка —
+/// шириной 420, размеры масштабируются под фактическую ширину.
+struct Watermark: View {
+    let spec: WatermarkSpec
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            let scale = geo.size.width / 420
+            let sz = spec.size * scale
+            content(size: sz)
+                .frame(width: sz, height: sz)
+                .rotationEffect(.degrees(spec.rotation))
+                .position(x: spec.cx * geo.size.width, y: spec.cy * geo.size.height)
+        }
+    }
+
+    @ViewBuilder private func content(size: CGFloat) -> some View {
+        switch spec.kind {
+        case .girih:
+            // Тесселяция girih (розетка в центре + четвертинки по углам), тонкой
+            // белой линией — «гравировка» по стеклу.
+            GirihPattern()
+                .stroke(Color.white.opacity(spec.opacity), lineWidth: max(1, size * 0.009))
+        case .crescent:
+            // Крупный тусклый полумесяц (цвет акцента).
+            Image(systemName: "moon.fill")
+                .resizable().scaledToFit()
+                .foregroundStyle(tint.opacity(spec.opacity))
+        }
+    }
+}
+
+/// Узор girih из макета (viewBox 120×120): центральная 16-конечная розетка
+/// (две восьмиконечные звезды со сдвигом 22.5°) + такие же четвертинки по углам.
+struct GirihPattern: Shape {
+    // Точки звёзд — ровно из SVG-эталона.
+    private static let big: [CGPoint] = [(0,-34),(9,-14),(34,-14),(14,2),(22,26),
+        (0,12),(-22,26),(-14,2),(-34,-14),(-9,-14)].map { CGPoint(x: $0.0, y: $0.1) }
+    private static let small: [CGPoint] = [(0,-18),(5,-7),(18,-7),(7,1),(12,14),
+        (0,6),(-12,14),(-7,1),(-18,-7),(-5,-7)].map { CGPoint(x: $0.0, y: $0.1) }
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let s = min(rect.width, rect.height) / 120   // из системы 120×120 в rect
+
+        func star(_ pts: [CGPoint], at c: CGPoint) {
+            for rot in [0.0, 22.5] {              // звезда + её копия, повёрнутая на 22.5°
+                let a = rot * .pi / 180, ca = CGFloat(cos(a)), sa = CGFloat(sin(a))
+                var poly = Path()
+                for (i, pt) in pts.enumerated() {
+                    let rx = pt.x * ca - pt.y * sa, ry = pt.x * sa + pt.y * ca
+                    let q = CGPoint(x: (c.x + rx) * s, y: (c.y + ry) * s)
+                    if i == 0 { poly.move(to: q) } else { poly.addLine(to: q) }
+                }
+                poly.closeSubpath()
+                p.addPath(poly)
+            }
+        }
+
+        star(Self.big, at: CGPoint(x: 60, y: 60))
+        for c in [CGPoint(x: 0, y: 0), CGPoint(x: 120, y: 0),
+                  CGPoint(x: 0, y: 120), CGPoint(x: 120, y: 120)] {
+            star(Self.small, at: c)
+        }
+        return p
     }
 }
 
