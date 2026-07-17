@@ -2,12 +2,21 @@ import SwiftUI
 import AppKit
 
 /// Приложение живёт в чёлке + иконка в строке меню (без окна и иконки в доке).
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let clock = ClockModel()
     private let location = LocationProvider()
     private let notifications = NotificationScheduler()
     private var controller: NotchController?
     private var settingsDebounce: DispatchWorkItem?
+
+#if !APPSTORE
+    /// Движок авто-обновления (Sparkle). Только для прямой .dmg-раздачи мимо
+    /// App Store; в App Store-сборке Sparkle не подключён (см. Updater.swift).
+    let updater = UpdaterManager()
+    /// Вызывается из пункта меню «Проверить обновления…».
+    func checkForUpdates() { updater.checkForUpdates() }
+#endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)      // без иконки в доке
@@ -108,10 +117,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct MiqatApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    // Язык интерфейса (тот же ключ, что и LanguageStore) — чтобы строки меню
+    // были на выбранном языке и обновлялись при его смене.
+    @AppStorage("miqat.language") private var lang: String = "ru"
+    private var isRU: Bool { lang != "en" }
 
     var body: some Scene {
         MenuBarExtra("Miqat", systemImage: "moon.stars.fill") {
-            Button("Выйти из Miqat") { NSApp.terminate(nil) }
+#if !APPSTORE
+            Button(isRU ? "Проверить обновления…" : "Check for Updates…") {
+                appDelegate.checkForUpdates()
+            }
+            Divider()
+#endif
+            Button(isRU ? "Выйти из Miqat" : "Quit Miqat") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }
     }

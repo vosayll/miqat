@@ -25,6 +25,9 @@ var packageDependencies: [Package.Dependency] = [
 var targetDependencies: [Target.Dependency] = [
     .product(name: "Adhan", package: "adhan-swift"),
 ]
+// Дополнительные таргеты пакета (напр. локальный бинарный Sparkle) — только для
+// обычной сборки. В App Store-варианте массив пустой.
+var extraTargets: [Target] = []
 var swiftSettings: [SwiftSetting] = []
 
 if appStore {
@@ -34,6 +37,17 @@ if appStore {
     // В App Store-сборке не подключается.
     packageDependencies.append(.package(url: "https://github.com/Lakr233/SkyLightWindow", from: "1.0.0"))
     targetDependencies.append(.product(name: "SkyLightWindow", package: "SkyLightWindow"))
+
+    // Sparkle — авто-обновление .dmg-сборки (раздаётся мимо App Store, через
+    // GitHub Releases). Подключаем как ЛОКАЛЬНЫЙ бинарный таргет
+    // (Vendor/sparkle/Sparkle.xcframework), а НЕ через .package(url:), потому что
+    // SPM тянет бинарный артефакт Sparkle с release-assets.githubusercontent.com,
+    // а этот CDN у нас режется (DPI). Лежащий в Vendor XCFramework — официальный
+    // Sparkle 2.9.4: SHA256 архива совпал с контрольной суммой из Package.swift
+    // самого Sparkle (та же проверка, что делает и SPM). Обновление Sparkle —
+    // заменить папку Vendor/sparkle новой версией.
+    targetDependencies.append(.target(name: "Sparkle"))
+    extraTargets.append(.binaryTarget(name: "Sparkle", path: "Vendor/sparkle/Sparkle.xcframework"))
 }
 
 let package = Package(
@@ -54,5 +68,5 @@ let package = Package(
             dependencies: ["Miqat"],
             resources: [.copy("Fixtures")]
         ),
-    ]
+    ] + extraTargets
 )

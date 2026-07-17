@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Корень: чёрная пилюля ↔ карточка темы. Плавный морфинг.
 struct NotchRootView: View {
@@ -29,6 +30,12 @@ struct NotchContainer: View {
     var body: some View {
         ZStack(alignment: .top) {
             shape.fill(fill)
+            if state.expanded, themeStore.style == .custom, let bg = themeStore.backgroundImage {
+                CustomBackground(image: bg, scale: themeStore.bgScale,
+                                 offsetX: themeStore.bgOffsetX, offsetY: themeStore.bgOffsetY,
+                                 size: size)
+                    .clipShape(shape).allowsHitTesting(false)
+            }
             if state.expanded, let wm = theme.watermark {
                 Watermark(spec: wm, tint: theme.accent)
                     .clipShape(shape).allowsHitTesting(false)
@@ -215,6 +222,33 @@ struct Watermark: View {
                 .resizable().scaledToFit()
                 .foregroundStyle(tint.opacity(spec.opacity))
         }
+    }
+}
+
+/// Пользовательская картинка-фон карточки (стиль «Свой фон»). Заполняет карточку,
+/// масштабируется и сдвигается по настройкам; сверху — затемнение, чтобы белый
+/// текст времён читался на любой картинке.
+struct CustomBackground: View {
+    let image: NSImage
+    let scale: Double
+    let offsetX: Double   // сдвиг в долях ширины карточки [-1…1]
+    let offsetY: Double   // сдвиг в долях высоты карточки [-1…1]
+    let size: CGSize
+
+    var body: some View {
+        Image(nsImage: image)
+            .resizable()
+            .scaledToFill()
+            .frame(width: size.width, height: size.height)
+            .scaleEffect(max(1, scale), anchor: .center)
+            .offset(x: offsetX * size.width, y: offsetY * size.height)
+            .frame(width: size.width, height: size.height)
+            .clipped()
+            .overlay(
+                // Сверху затемняем сильнее (там таймер и город), снизу — под чипы.
+                LinearGradient(colors: [.black.opacity(0.50), .black.opacity(0.22), .black.opacity(0.42)],
+                               startPoint: .top, endPoint: .bottom)
+            )
     }
 }
 

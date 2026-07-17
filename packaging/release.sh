@@ -44,3 +44,27 @@ xcrun stapler staple "$DMG"
 
 echo "✓ Готово: $DMG"
 spctl -a -vvv --type open --context context:primary-signature "$DMG" 2>&1 | tail -3
+
+# ─── Публикация на miqat.space (Sparkle appcast + .dmg) ───────────────────────
+# Выполняется, ТОЛЬКО если заданы ключ подписи Sparkle и FTP-пароль — иначе просто
+# оставляем собранный .dmg. Задать один раз (напр. в ~/.zshrc):
+#   export MIQAT_SPARKLE_KEY="$HOME/.miqat/sparkle-key"   # приватный EdDSA-ключ (chmod 600)
+#   export MIQAT_FTP_PASS="…"                              # пароль FTP Sweb
+# После этого выпуск новой версии = поднять версию в Info.plist + запустить этот скрипт.
+KEYFILE="${MIQAT_SPARKLE_KEY:-$HOME/.miqat/sparkle-key}"
+if [ -f "$KEYFILE" ] && [ -n "${MIQAT_FTP_PASS:-}" ]; then
+  echo "▶︎ appcast + публикация на miqat.space…"
+  STAGE="$ROOT/.appcast-stage"; rm -rf "$STAGE"; mkdir -p "$STAGE"
+  cp "$DMG" "$STAGE/Miqat.dmg"
+  # Ключ читаем из файла (не из Keychain) — чтобы не ловить диалоги доступа.
+  "$ROOT/Vendor/sparkle/bin/generate_appcast" --ed-key-file "$KEYFILE" \
+      --download-url-prefix "https://miqat.space/" "$STAGE" >/dev/null
+  FTP="ftp://wols201562_1:${MIQAT_FTP_PASS}@77.222.40.251/public_html"
+  curl -sS -T "$STAGE/Miqat.dmg"   "$FTP/Miqat.dmg"   -w "  Miqat.dmg → HTTP %{http_code}\n"
+  curl -sS -T "$STAGE/appcast.xml" "$FTP/appcast.xml" -w "  appcast.xml → HTTP %{http_code}\n"
+  rm -rf "$STAGE"
+  echo "✓ Опубликовано: https://miqat.space/Miqat.dmg + appcast.xml"
+else
+  echo "ⓘ Публикация пропущена (нет файла MIQAT_SPARKLE_KEY или переменной MIQAT_FTP_PASS)."
+  echo "  Собранный .dmg лежит здесь: $DMG"
+fi

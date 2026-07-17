@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 /// Форма настроек — стандартный macOS-стиль (Form + секции).
 /// Все значения пишутся в UserDefaults сразу (@AppStorage), без кнопки
@@ -189,6 +191,33 @@ struct SettingsView: View {
                         Text(language.t("Тёмная", "Dark")).tag(true)
                     }
                 }
+                // «Свой фон»: выбор картинки + масштаб/сдвиг картинки внутри карточки.
+                if themeStore.style == .custom {
+                    HStack {
+                        Button(language.t("Выбрать изображение…", "Choose image…")) {
+                            chooseBackground()
+                        }
+                        if themeStore.backgroundImage != nil {
+                            Spacer()
+                            Button(language.t("Убрать", "Remove")) { themeStore.clearBackground() }
+                        }
+                    }
+                    if themeStore.backgroundImage != nil {
+                        LabeledContent(language.t("Масштаб", "Scale")) {
+                            Slider(value: $themeStore.bgScale, in: 1.0...3.0)
+                        }
+                        LabeledContent(language.t("Сдвиг по горизонтали", "Offset X")) {
+                            Slider(value: $themeStore.bgOffsetX, in: -0.5...0.5)
+                        }
+                        LabeledContent(language.t("Сдвиг по вертикали", "Offset Y")) {
+                            Slider(value: $themeStore.bgOffsetY, in: -0.5...0.5)
+                        }
+                    } else {
+                        Text(language.t("Выберите картинку — она станет фоном раскрытой карточки.",
+                                        "Pick an image — it becomes the expanded card background."))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
@@ -217,6 +246,19 @@ struct SettingsView: View {
         manualLon = 0
         manualGeonameId = 0
         citySearch = ""
+    }
+
+    /// Выбор картинки-фона (стиль «Свой фон») — системный диалог. Копия в
+    /// Application Support делается в ThemeStore.setBackground.
+    private func chooseBackground() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.prompt = language.t("Выбрать", "Choose")
+        if panel.runModal() == .OK, let url = panel.url {
+            themeStore.setBackground(from: url)
+        }
     }
 
     /// Подпись под названием: страна и население (для различения тёзок).

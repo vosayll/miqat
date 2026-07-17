@@ -8,8 +8,8 @@
     <key>CFBundleExecutable</key>          <string>Miqat</string>
     <key>CFBundleIconFile</key>            <string>AppIcon</string>
     <key>CFBundlePackageType</key>         <string>APPL</string>
-    <key>CFBundleShortVersionString</key>  <string>1.3.0</string>
-    <key>CFBundleVersion</key>             <string>4</string>
+    <key>CFBundleShortVersionString</key>  <string>1.4.0</string>
+    <key>CFBundleVersion</key>             <string>5</string>
     <key>LSMinimumSystemVersion</key>      <string>13.0</string>
 
     <!-- Агент-приложение: без иконки в доке (совпадает с .accessory в коде) -->
@@ -20,5 +20,15 @@
     <string>Miqat использует вашу геолокацию, чтобы показывать точное время намаза для вашего города.</string>
 
     <key>NSHumanReadableCopyright</key>    <string>© 2026 vosayll</string>
+
+    <!-- Sparkle: авто-обновление. Работает только в обычной .dmg-сборке; в
+         App Store-сборке Sparkle не подключён, и эти ключи там просто не читаются.
+         SUFeedURL — лента обновлений (на локальном тесте перекрывается переменной
+         окружения MIQAT_FEED_URL). SUPublicEDKey — публичная половина ключа
+         подписи обновлений; приватная лежит в Keychain разработчика. -->
+    <key>SUFeedURL</key>                   <string>https://miqat.space/appcast.xml</string>
+    <key>SUPublicEDKey</key>               <string>Tx1gaKQOqWHUVGOEFmlXfN15YNoIIfY3XnR7i9hjw/M=</string>
+    <key>SUEnableAutomaticChecks</key>     <true/>
+    <key>SUScheduledCheckInterval</key>    <integer>86400</integer>
 </dict>
 </plist>
